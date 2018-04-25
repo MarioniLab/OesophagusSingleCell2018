@@ -1,0 +1,630 @@
+---
+title: "Characterisation of pure normal tissues"
+author: "Juliane Perner"
+date: "05/04/2018"
+output: html_document
+---
+
+###########################
+# Preliminaries
+###########################
+
+```{r setup, include=FALSE}
+	# Rscript -e "library(rmarkdown); render('ByTissueClustering.Rmd')"
+	knitr::opts_chunk$set(	echo=TRUE,
+				results='asis',
+				fig.align='center')
+```
+
+##############
+## Load libraries and functions
+##############
+
+```{r libraries, message=FALSE}
+library(ggplot2)
+library(pheatmap)
+library(Rtsne)
+library(scran)
+library(cowplot)
+library(RColorBrewer)
+library(Matrix)
+library(dynamicTreeCut)
+library(reshape2)
+library(cluster)
+source("../Functions/auxiliary.R")
+```
+
+##############
+## Set variables and paths to data
+##############
+
+I'm only looking into NE, SMG, GC and D2 taking all data we have for these tissues, regardless of whether the patient had Barrett's or not. Samples from Patient 4 and the gland and duct samples from Patient 6 were excluded because only cultured cells were sequenced. Patient 5 was excluded because of ambiguous pathology and high normal esophagus content in both GOJ and GC samples. 
+
+```{r pathsAndglobalVars}
+# input folders, tissues, patients
+patientFolders <- "/Users/nils/Dropbox (Cambridge University)/Oesophagus_single_cell/"
+tissues <- c("NE", "SMG", "GOJ", "GC", "D2", "BE", "SCJ")
+patients <- c("Patient1", "Patient2", "Patient3", "Patient6", "Patient7", "Patient8", "Patient9", "Patient10", "Patient11")
+
+# reference patient ID for batch correction for each tissue
+refPatientID <- c( NE="Patient2", 
+		SMG="Patient11",
+		GOJ="Patient2",
+		GC="Patient2", 
+		D2="Patient9",
+		BE="Patient7",
+		SCJ="Patient3")
+
+# set patient categories
+patientCats <- c(`1`="Biopsy", 
+		`2`="Biopsy", 
+		`3`="Barrett's",
+		`6`="Donor", 
+		`7`="Barrett's", 
+		`8`="Biopsy", 
+		`9`="Barrett's",
+		`10`="Donor",
+		`11`="Donor")
+
+# set graphic parameters
+patientCols <- brewer.pal(length(patients), "Set1")
+names(patientCols) <- gsub("Patient", "", patients)
+```
+
+############################
+# Load and batch-correct data
+############################
+
+Here, I load the available samples for each tissue type and batch-correct each tissue type across patient. First, only genes present in all cells and expressed in at least one cell of a tissue are retained. The top-1000 most highly variable genes are obtained by applying decomposeVar to the log2-transformed data. Batch-correction across patients is performed using mnnCorrect and the highly variable genes.
+
+```{r buildTissueRef}
+# find all files per tissue and selected patients
+files_byTissue <- sapply(tissues, function(x) list.files(patientFolders, pattern=paste0("*_", x, "_norm.rds"), recursive=TRUE, full.name=TRUE))
+files_byTissue <- sapply(files_byTissue, function(x) grep(paste0(patients, collapse="|"), x, value=TRUE))
+
+# reorder for use in reference in batch correction
+files_byTissue <- sapply(names(files_byTissue), function(tissue) {
+	files <- files_byTissue[[tissue]]
+	rp <- refPatientID[[tissue]]
+	if(any(grepl(rp, files))) {
+		c(grep(rp, files, value=TRUE), grep(rp, files, value=TRUE, invert=TRUE)) 
+	}else{ files }})
+
+# go through each tissue
+tsne_byTissue <-list() # tsne result based on batch corrected data and highly variable genes
+hgv_byTissue <- list()	# highly variable genes on all samples from same tissue
+bcdata_byTissue <- list() # batch corrected data
+normdata_byTissue <- list() # QC-passed data
+for(tissue in tissues){
+	# load data
+	normdata_byTissue[[tissue]] <- loadData(files_byTissue[[tissue]])
+
+	# filter CD45+ or VIM+ cells
+	#normdata_byTissue[[tissue]] <- filterData(normdata_byTissue[[tissue]], cd45=TRUE, vim=TRUE)
+
+	# find highly variable genes
+	hgv_byTissue[[tissue]] <- getHVGs(normdata_byTissue[[tissue]])
+
+	# batch correct if more than one sample
+	if(length(files_byTissue[[tissue]])>1){
+		# batch correct
+		bcdata_byTissue[[tissue]] <- batchCorrect(normdata_byTissue[[tissue]], hgv_byTissue[[tissue]])
+		# reset colnames and combine
+		for(i in 1:length(bcdata_byTissue[[tissue]]$corrected)) {
+			colnames(bcdata_byTissue[[tissue]]$corrected[[i]]) <- colnames(normdata_byTissue[[tissue]][[i]])
+		}
+		bcdata_byTissue[[tissue]] <- do.call("cbind", bcdata_byTissue[[tissue]]$corrected)
+	}else{
+		# just log transform
+		bcdata_byTissue[[tissue]] <- log2( as.matrix(normdata_byTissue[[tissue]][[1]])[hgv_byTissue[[tissue]], ] +1 )
+	}
+
+	# perform tsne
+	set.seed(123)
+	tsne_byTissue[[tissue]] <- Rtsne( t(bcdata_byTissue[[tissue]]) )
+}
+```
+
+############################
+# QC by tissue
+############################
+
+We expect similar cellular composition for samples of the same tissue. Hence, in the t-SNE plot all cell groups should be supported by several patients. Further, cells with low quality should not stand out as a separate group. I am using the raw data to calculate different QC statistics.
+
+##############
+## Prepare QC data
+##############
+
+```{r qcSummary}
+# find all relevant raw data files
+files <- list.files(patientFolders, pattern="*matrix.mtx", recursive=TRUE, full.name=TRUE)
+files <- grep(paste0(patients, collapse="|"), files, value=TRUE)
+files <- grep(paste0(tissues, collapse="|"), files, value=TRUE)
+
+# process one file at a time ---- FROM NILS QC_NORM; BETTER TO GET STATS FROM THERE?
+qcHelper <- function(file){
+	# load data
+	input <- readMM(file)
+	prefix <- paste0(grep("Patient|SIGA|HCAT", strsplit(file, "/")[[1]], value=TRUE), collapse="_")
+	colnames(input) <- paste(prefix, seq(1,ncol(input)), sep="_")
+	genes <- read.table(gsub("matrix.mtx", "genes.tsv", file))
+	rownames(input) <- genes[,2]
+
+	# get library size per cell
+	libsize <- colSums(input)
+
+	# get number of expressed genes by cell
+	numexpr <- apply(input>0, 2, sum)
+
+	# get percent of ribosomal rna
+	ribogenes <- readLines("ribogenes.txt")
+	ribogenes <- row.names(input)[apply(sapply(ribogenes, grepl, x=row.names(input)), 1, any)]
+	ribopercent <- colSums(input[ribogenes,])/libsize
+		
+	# get percent of mitochondria rna
+	mitogenes <- grepl("^MT-", row.names(input))
+	mitopercent <- colSums(input[mitogenes,])/libsize
+	
+	return(cbind(libsize, numexpr, ribopercent, mitopercent))
+}
+qcstats <- sapply(files, qcHelper)
+qcstats <- do.call("rbind", qcstats)
+```
+
+##############
+## Plot QC 
+##############
+
+```{r plotQC, fig.width=25, fig.height=25}
+# for shared legends
+qcstats <- qcstats[unlist(sapply(bcdata_byTissue, colnames)),]
+libsize_lim <- summary(log10(qcstats[,"libsize"]))[c("Min.", "Max.")]
+numexpr_lim <- summary(qcstats[,"numexpr"])[c("Min.", "Max.")]
+ribo_lim <- summary(qcstats[,"ribopercent"])[c("Min.", "Max.")] *100
+mito_lim <- summary(qcstats[,"mitopercent"])[c("Min.", "Max.")] *100
+
+# make all plots for all tissues
+plots <- vector("list", length(tissues))
+names(plots) <- tissues
+for( tissue in tissues ) {
+	# make data frame with QC data for plotting
+	#samples <- sub("_[0-9].*", "", colnames(bcdata_byTissue[[tissue]]))
+	#samples <- factor(sampleToPatient[samples])
+	samples <- factor(gsub("Patient", "", sub("_.*", "", colnames(bcdata_byTissue[[tissue]]))))
+	cells <- colnames(bcdata_byTissue[[tissue]])
+	toplot <- data.frame( tsne1=tsne_byTissue[[tissue]]$Y[,1], 
+				tsne2=tsne_byTissue[[tissue]]$Y[,2],
+				Patient=factor(samples, levels=names(patientCols)),
+				PatientClass=factor(patientCats[samples], levels=unique(patientCats)))
+	toplot <- cbind(toplot, qcstats[cells,])
+
+	# plot the tsne plot with different coloring
+	basePlot <- ggplot(toplot, aes(x=tsne1, y=tsne2)) +
+			background_grid(major="none", minor="none") +
+			ggtitle(tissue) + xlab("t-SNE1") + ylab("t-SNE2") + 
+			theme(	legend.title=element_text(size=10, face="bold"), 
+				legend.text=element_text(size=10),
+				legend.position="none") 
+
+	# highlighting the patient
+	plots[[tissue]]$patient <- basePlot + geom_point(aes(colour=Patient), size=.25) + 
+			scale_color_manual(values=patientCols) +
+			guides(colour=guide_legend(override.aes=list(size=2)))
+
+	plots[[tissue]]$patientClass <- basePlot + geom_point(aes(colour=PatientClass), size=.25) + 
+			scale_color_brewer(palette="Set2") +
+			guides(colour=guide_legend(override.aes=list(size=2)))
+	
+	# highlighting the libsize
+	plots[[tissue]]$libsize <- basePlot + 
+			geom_point(aes(colour=log10(libsize)), size=.25) + 
+			scale_color_gradientn(colours=brewer.pal(5, "YlGnBu"), 
+						limits=libsize_lim, 
+						name="log10(library size)")
+	
+	# highlighting the numexpr
+	plots[[tissue]]$numexpr <- basePlot + 
+			geom_point(aes(colour=numexpr), size=.25) + 
+			scale_color_gradientn(colours=brewer.pal(5, "YlGnBu"), 
+						limits=numexpr_lim, 
+						name="Expressed genes")
+	
+	# highlighting the ribopercent
+	plots[[tissue]]$ribopercent <- basePlot + 
+			geom_point(aes(colour=ribopercent*100), size=.25) + 
+			scale_color_gradientn(colours=brewer.pal(5, "Spectral"), 
+						limits=ribo_lim, 
+						name="Ribosomal")
+	
+	# highlighting the mitopercent
+	plots[[tissue]]$mitopercent <- basePlot + 
+			geom_point(aes(colour=mitopercent*100), size=.25) + 
+			scale_color_gradientn(colours=brewer.pal(5, "Spectral"), 
+						limits=mito_lim, 
+						name="Mitochondrial")
+}
+
+# add legends
+legends <- list()
+for(i in 1:length(plots[["GC"]])) {
+	legends[[i]] <- get_legend(plots[["GC"]][[i]] + theme(legend.position="right"))
+}
+names(legends) <- names(plots[["GC"]])
+
+# plot everything into one Figure plot; TODO
+what <- names(plots[["NE"]])
+n <- length(plots)
+lines <- sapply(what, function(x) paste0( sapply(tissues, function(y) paste0("plots[[\"", y, "\"]][[\"", x, "\"]]")), collapse=", "))
+lines <- sapply(what, function(x) paste(lines[x], paste0("legends[[\"", x, "\"]]"), sep=", "))
+funcText <- paste0("plot_grid( ", paste0(lines, collapse=", "),
+		", labels=c(\"A\", rep(\"\", n), \"B\", rep(\"\", n), \"C\", rep(\"\", n), \"D\", rep(\"\", n), \"E\", rep(\"\", n)), ncol=n+1, rel_widths=c(rep(1,n),0.5))")
+eval( parse(text=funcText) )
+```
+
+############################
+# Clustering by tissue
+############################
+
+For clustering cells into distinct populations, I'm performing hierarchical clustering using the Ward.D2 agglomeration method and the distance measure based on Spearman's correlation coefficient on the batch-corrected data. The dendrogram is then cut using dynamicTreeCut with various combinations of minimum cluster size and deepSplit to vary the granularity of the clustering. The final clustering solution has maximal average silhouette score. For quality control, each cluster should be made up of cells from different patients and each patient should contribute to each cluster.
+
+##############
+## Clustering
+##############
+
+```{r perTissueCluster}
+# possible parameters for cutreeDynamic
+mcl <- c(20, 50, 100, 150, 200)
+ds <- 0:4
+
+# perform hierarchical clustering with dynamic tree cut on each tissue
+clusters_byTissue <- vector("list", length(tissues))
+names(clusters_byTissue) <- tissues
+for( tissue in tissues ){
+	# distance matrix based on spearman correlation
+	d <- as.dist(sqrt((1 - cor(bcdata_byTissue[[tissue]], method="spearman"))/2))
+	# hierarchical clustering
+	hc <- hclust(d, method="ward.D2")
+	# dynamic tree cut
+	bestscore <- 0
+	for(cur_mcl in mcl){
+		for(cur_ds in ds){
+			tmp <- cutreeDynamic(dendro=hc, 
+						distM=as.matrix(d), 
+						minClusterSize=cur_mcl, 
+						deepSplit=cur_ds, 
+						verbose=0)
+			sil <- summary(silhouette(tmp, dist=d))$avg.width
+			if( sil>=bestscore & !any(tmp==0) ){
+				bestscore <- sil
+				clusters_byTissue[[tissue]] <- tmp
+				names(clusters_byTissue[[tissue]]) <- hc$labels
+			}
+		}
+	}
+}
+```
+
+##############
+## QC of cluster solutions
+##############
+
+```{r plotClusterQC, fig.width=20, fig.height=7, message=FALSE}
+# helper function to tabulate and get fractions (either cluster by patient or patient by cluster)
+fracHelper <- function(x, y, clustername, samplename){
+	# table x by y	
+	tab <- tapply(x, y, table)
+
+	# make fractions
+	tab <- lapply(tab, function(cur_tab) cur_tab/sum(cur_tab))
+
+	# convert to data frame for plotting
+	tab <- melt(tab)
+	# if you one patient add column
+	#if(length(unique(x))==1){
+	#	tab$Patient <- sampleToPatient[as.character(unique(x))]
+	#}else{
+	#	tab$Patient <- sampleToPatient[as.character(tab[,samplename])]
+	#}
+	tab$Cluster <- factor(tab[, clustername], levels=0:max(tab[, clustername]))
+	return(tab)
+}
+
+# for each patient, check fraction of cells in each cluster
+fracplots1 <- vector("list", length(tissues))
+names(fracplots1) <- tissues
+for( tissue in tissues ) {
+
+	# table cells by cluster and sample
+	#samples <- sub("_[0-9].*", "", colnames(bcdata_byTissue[[tissue]]))
+	samples <- factor(gsub("Patient", "", sub("_.*", "", colnames(bcdata_byTissue[[tissue]]))))
+	tab_cl_sample <- fracHelper(x=clusters_byTissue[[tissue]], y=samples, clustername="Var1", samplename="L1")
+
+	# barplot of fractions
+	fracplots1[[tissue]] <- ggplot(tab_cl_sample, aes(x=L1, y=value, fill=Cluster)) +
+				geom_bar(stat="identity") +
+				background_grid(major="none", minor="none") +
+				ggtitle(tissue) + xlab("Patient") + ylab("Fraction of cells") + 
+				theme(	legend.title=element_text(size=10, face="bold"),
+					legend.text=element_text(size=10)) +
+				scale_fill_manual(values=c(brewer.pal(8, "Dark2"), rev(brewer.pal(8, "Set1"))))
+}
+
+# for each patient, check fraction of cells in each cluster
+fracplots2 <- vector("list", length(tissues))
+names(fracplots2) <- tissues
+for( tissue in tissues ) {
+
+	# table cells by cluster and sample
+	#samples <- sub("_[0-9].*", "", colnames(bcdata_byTissue[[tissue]]))
+	samples <- factor(gsub("Patient", "", sub("_.*", "", colnames(bcdata_byTissue[[tissue]]))))
+	tab_cl_sample <- fracHelper(y=clusters_byTissue[[tissue]], x=samples, clustername="L1", samplename="Var1")
+
+	# barplot of fractions
+	fracplots2[[tissue]] <- ggplot(tab_cl_sample, aes(x=Cluster, y=value, fill=factor(Var1))) +
+				geom_bar(stat="identity") +
+				background_grid(major="none", minor="none") +
+				ggtitle(tissue) + xlab("Cluster") + ylab("Fraction of cells") + 
+				theme(	legend.title=element_text(size=10, face="bold"),
+					legend.text=element_text(size=10)) +
+				scale_fill_manual(values=patientCols) + 
+				guides(fill=guide_legend(title="Patient"))
+}
+n <- length(fracplots1)
+funcText <- paste0("plot_grid( ", paste(sapply(names(fracplots1), function(x) paste0("fracplots1[[\"", x ,"\"]]")), collapse=",") , ",",
+			paste(sapply(names(fracplots2), function(x) paste0("fracplots2[[\"", x ,"\"]]")), collapse=","), 
+		", labels=c(\"A\", rep(\"\", n), \"B\", rep(\"\", n)), nrow=2)")
+eval( parse(text=funcText) )
+```
+
+##############
+## Plot cluster solutions
+##############
+
+```{r plotPerTissueCluster, fig.width=20, fig.height=8, message=FALSE}
+# make tSNE plots
+tsneplots <- vector("list", length(tissues))
+names(tsneplots) <- tissues
+for( tissue in tissues ) {
+	# make data frame with QC data for plotting
+	toplot <- data.frame( tsne1=tsne_byTissue[[tissue]]$Y[,1], 
+				tsne2=tsne_byTissue[[tissue]]$Y[,2],
+				Cluster=factor(clusters_byTissue[[tissue]]))
+
+	# cluster colors and labels
+	cols <- c("black", brewer.pal(8, "Dark2"), rev(brewer.pal(8, "Set1")))
+	names(cols) <- 0:(length(cols)-1)
+	cl_tab <- table(clusters_byTissue[[tissue]])
+	cols_lab <- min(as.numeric(names(cl_tab))):max(as.numeric(names(cl_tab)))
+	cols_lab <- sapply(cols_lab, function(x) paste0(x, " (n=", cl_tab[as.character(x)], ")"))
+
+	# plot the tsne plot with different coloring
+	tsneplots[[tissue]] <- ggplot(toplot, aes(x=tsne1, y=tsne2)) +
+			geom_point(aes(colour=Cluster), size=.5) +
+			background_grid(major="none", minor="none") +
+			ggtitle( paste0(tissue, " (n=", nrow(toplot), ")") ) + 
+			xlab("t-SNE1") + ylab("t-SNE2") + 
+			theme(	legend.title=element_text(size=10, face="bold"), 
+				legend.text=element_text(size=10)) +
+			scale_color_manual(values=cols, labels=cols_lab) + 
+			guides(colour=guide_legend(override.aes=list(size=2)))
+}
+
+# plot everything into one Figure plot
+n <- length(tsneplots)
+funcText <- paste0("plot_grid( ", paste(sapply(names(tsneplots), function(x) paste0("tsneplots[[\"", x ,"\"]]")), collapse=",") , ", nrow=2)")
+eval( parse(text=funcText) )
+```
+
+##############
+## Plot known markers
+##############
+
+```{r prepPlotHandpickedMarkers}
+# list of genes whose expression we would like to check in each tissue
+genesToPlot <- list( GC=c("MUC5AC", "TFF1", "GKN1", "GKN2", "MUC6", "TFF2", "PGA3", "PGA4", "PGA5", "PGC", "GIF", "GAST", "CHGA", "LIPF", "LYZ", "VIM"),
+			NE=c("KRT14", "TP63", "KRT5", "KRT13", "KRT4", "KRT3", "KRT7", "KRT6C", "KRT6B", "KRT8", "KRT19", "VIM"),
+			D2=c("SOX9", "ALPI", "GHRL", "GRHL1", "GRHL2", "GRHL3", "CCK", "SCT", "TRPM5", "DLL1", "OLFM4", "HES1", "BMI1", "DCLK1", "GFI1", "MSI1", "PROM1", "LYZ", "LGR5", "ASCL2", "TFF3", "REG4", "CHGA", "CA1", "CA2", "KRT20", "CEACAM1", "VIM"))
+
+# geneID to HGNC map
+geneMap <- read.table(paste0(patientFolders, "Patient3/Data/SIGAA5_NE/genes.tsv"), stringsAsFactors = FALSE)
+rownames(geneMap) <- geneMap[,1]
+
+# plot
+plotlist <- list()
+for(tissue in tissues){
+	# transform data for plotting
+	data <- sapply(normdata_byTissue[[tissue]], function(x) log2(x+1))
+	data <- do.call("cbind", data)
+
+	# go through all genes
+	tmp <- list()
+	for(g in genesToPlot[[tissue]]){
+		# get the ensembl id for that gene
+		e <- geneMap[geneMap[,2]%in%g, 1]
+	
+		# reduce gene list to genes present in the data
+		if( e %in% row.names(data) ){	
+			# make df for plotting
+			toplot <- data.frame( tsne1=tsne_byTissue[[tissue]]$Y[,1], 
+						tsne2=tsne_byTissue[[tissue]]$Y[,2],	
+						norm_expr=data[e,],
+						gene=g)
+			tmp[[g]] <- ggplot(toplot, aes(x=tsne1, y=tsne2)) +
+						geom_point(aes(color=norm_expr), size=.5) +
+						background_grid(major="none", minor="none") +
+						xlab("t-SNE1") + ylab("t-SNE2") + ggtitle(g) +
+						theme( axis.line=element_blank(),
+							axis.text.x=element_blank(),
+							axis.text.y=element_blank(),
+							axis.ticks=element_blank(),
+							axis.title.x=element_blank(),
+							axis.title.y=element_blank(),
+							panel.background=element_blank(),
+							panel.border=element_blank(),
+							panel.grid.major=element_blank(),
+							panel.grid.minor=element_blank(),
+							plot.background=element_blank()) +
+						scale_color_gradientn(colours=rev(colorRampPalette(brewer.pal(9, "YlGnBu"))(100))) 
+		}
+	}
+	if(length(tmp)>0){
+		#legend <- get_legend(tmp[[1]] + theme(legend.position="right"))
+		funcText <- paste0("plot_grid(", 
+					paste0("tmp[[", 1:length(tmp), "]]", collapse=", 
+					"), ", ncol=4)")
+		plotlist[[tissue]] <- eval( parse(text=funcText) )
+	}
+}		
+```
+
+##############
+### GC
+##############
+```{r plotHandpickedMarkers1, fig.width=20, fig.height=15, message=FALSE}
+print(plotlist[["GC"]])
+```
+
+##############
+### NE
+##############
+```{r plotHandpickedMarkers2, fig.width=15, fig.height=10, message=FALSE}
+print(plotlist[["NE"]])
+```
+
+##############
+### D2
+##############
+```{r plotHandpickedMarkers3, fig.width=15, fig.height=20, message=FALSE}
+print(plotlist[["D2"]])
+```
+
+#############
+# Marker gene detection 
+#############
+
+In each tissue, I'm looking for genes that are specifically enriched in a cluster compared to all other clusters. I use the normalised, log2-transformed but not batch-corrected data for each tissue and the findMarkers function with the patient as blocking term. Genes with a FDR < 0.1 (based on combined p-values across contrasts) and a log-foldchange of > 1 over all contrasts are selected. 
+
+```{r markerGenes}
+# marker plots
+markers_byTissue <- vector("list", length(tissues))
+names(markers_byTissue) <- tissues
+for( tissue in tissues ) {
+        # merge data
+        genes <- lapply(normdata_byTissue[[tissue]], row.names)
+        genes <- table(unlist(genes))
+        genes <- names(genes)[genes>=length(normdata_byTissue[[tissue]])]
+        prepData <- sapply(normdata_byTissue[[tissue]], function(x){x[genes,]})
+        prepData <- do.call("cbind", prepData)
+
+        # subselect expressed genes and log-transform
+        prepData <- prepData[rowMeans(prepData)>0.1, ]
+        prepData <- log2(prepData+1)
+
+        # get marker genes
+        samples <- intersect(colnames(prepData), names(clusters_byTissue[[tissue]]))
+	patient <- sapply(strsplit(samples, "_"), "[", 1)
+	design <- model.matrix(~patient)
+        markerres <- findMarkers(prepData[,samples], clusters=clusters_byTissue[[tissue]][samples], design=design)
+        markers_byTissue[[tissue]] <- lapply(markerres, function(x) {
+				x[x$FDR<0.1 & apply(x[grepl("logFC", names(x))]>0, 1, all), ] })
+}
+```
+
+```{r plotMarkerGenesFunction}
+# plot the heatmap of markers
+plotMarkersTissue <- function(tissue){
+	# set possible cluster colors 
+	cols <- c("black", brewer.pal(8, "Dark2"), rev(brewer.pal(8, "Set1")))
+	names(cols) <- 0:(length(cols)-1)
+
+	# select only the genes among the top 100 per cluster
+	topmarkers <- sapply(markers_byTissue[[tissue]], function(x) x[x$Top<100, "Gene"])
+	if(any(duplicated(unlist(topmarkers)))) warning("duplicated marker genes")
+	tm <- unique(unlist(topmarkers))	
+
+	# transform data for plotting
+	data <- sapply(normdata_byTissue[[tissue]], function(x) log2(x+1))
+	data <- do.call("cbind", data)
+
+	# mean-scale data by gene
+	toplot <- data - rowMeans(data)
+
+	# reorder genes and samples by cluster
+	toplot <- toplot[tm, names(sort(clusters_byTissue[[tissue]]))]
+
+	# map gene names
+	row.names(toplot) <- geneMap[tm, 2]
+	
+	# plot 
+	minmax <- max(abs(toplot))
+	df_col <- data.frame(cluster=factor(clusters_byTissue[[tissue]]), row.names=names(clusters_byTissue[[tissue]]))
+	df_row <- data.frame(cluster=factor(rep(names(topmarkers), sapply(topmarkers, length))), row.names=geneMap[tm, 2])
+	pheatmap(toplot, cluster_cols=FALSE, cluster_rows=FALSE, 
+		annotation_col=df_col,
+		annotation_row=df_row,
+		annotation_colors=list(cluster=cols[levels(df_col$cluster)]),
+		gaps_row=cumsum(table(df_row$cluster)),
+		gaps_col=cumsum(table(df_col$cluster)),
+		show_colnames=FALSE, show_rownames=FALSE,
+		breaks=seq(-minmax, minmax, length.out=51),
+        	color=colorRampPalette(c("navy", "grey94", "firebrick3"))(50), main=tissue)
+
+	return(df_row)
+}
+```
+
+```{r plotMarkerGenes1, fig.width=7, fig.height=10}
+m <- plotMarkersTissue("GC")
+write.csv(m, file="markers_GC.csv")
+```
+
+```{r plotMarkerGenes2, fig.width=14, fig.height=10}
+m <- plotMarkersTissue("NE")
+write.csv(m, file="markers_NE.csv")
+```
+
+```{r plotMarkerGenes3, fig.width=5, fig.height=5}
+m <- plotMarkersTissue("D2")
+write.csv(m, file="markers_D2.csv")
+```
+
+```{r plotMarkerGenes4, fig.width=5, fig.height=5}
+m <- plotMarkersTissue("SMG")
+write.csv(m, file="markers_SMG.csv")
+```
+
+##############
+## Get differentially expressed genes between normal tissues
+##############
+
+```{r goEnr, message=FALSE, warning=FALSE}
+# functions for GO enrichment
+source("goEnr.R")
+# mean expression across all cells
+rm <- rowMeans(prepData)
+
+markers_all <- unlist(markers_byTissue, recursive=FALSE)
+
+res <- list()
+for(i in 1:length(markers_all)){
+	# get markers
+	geneselect <- intersect(names(rm), markers_all[[i]]$Gene)
+
+	# make background with similar expression
+	universe <- prepUniverse(rm, geneselect)
+	
+	# prep input
+	newGeneList <- makeGeneList(universe, geneselect)
+	
+	# run GO-enrichment
+	testall <- runEnrichment(newGeneList, topnodes=50)
+	res[[i]] <- testall
+}
+
+goenr <- lapply(res, function(x) x[ x$Fisher.classic<0.01 & x$Fisher.elim<0.05 , ])
+names(goenr) <- names(markers_all)
+```
+
+```{r saveall, echo=FALSE}
+save(list=c("clusters_byTissue", "normdata_byTissue", "markers_byTissue", "tsne_byTissue", "goenr"), file="byTissue.RData")
+```
