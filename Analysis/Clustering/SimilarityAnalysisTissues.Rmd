@@ -1,0 +1,188 @@
+---
+title: "Similarity analysis between tissues"
+author: "Nils Eling"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '/Users/nils/Dropbox (Cambridge University)/Oesophagus_single_cell/Clustering/SimilarityAcrossAllTissues.html') })
+---
+
+###########################
+# Preliminaries
+###########################
+
+```{r setup, include=FALSE}
+	# Rscript -e "library(rmarkdown); render('ByTissueClustering.Rmd')"
+	knitr::opts_chunk$set(	echo=TRUE,
+				results='asis',
+				fig.align='center')
+```
+
+##############
+## Load libraries and functions
+##############
+
+```{r libraries, message=FALSE}
+library(ggplot2)
+library(pheatmap)
+library(Rtsne)
+library(scran)
+library(cowplot)
+library(RColorBrewer)
+library(Matrix)
+library(dynamicTreeCut)
+library(reshape2)
+library(cluster)
+library(viridis)
+source("../Functions/auxiliary.R")
+```
+
+##############
+## Define data to use
+##############
+
+```{r samples}
+patientFolders <- "/Users/nils/Dropbox (Cambridge University)/Oesophagus_single_cell/"
+
+# Load the samples based on order for batch correction
+samples <- list(c("Patient2", "NE"), c("Patient2", "GOJ"), c("Patient2", "GC"),
+                c("Patient7", "NE"), c("Patient7", "SCJ"), c("Patient7", "BE"),
+                c("Patient7", "GC"), c("Patient7", "D2"),
+                c("Patient8", "NE"), c("Patient8", "GOJ"), c("Patient8", "D2"),
+                c("Patient10", "NE"), c("Patient10", "GOJ"), c("Patient10", "SMG"),
+                c("Patient3", "SCJ"), c("Patient3", "BE"), c("Patient3", "GC"),
+                c("Patient9", "SCJ"), c("Patient9", "BE"), c("Patient9", "D2"),
+                c("Patient11", "SMG"))
+
+all.files <- list.files(patientFolders, 
+                        pattern = "*_norm.rds",
+                        full.names = TRUE, 
+                        recursive = TRUE)
+
+files <- unlist(sapply(samples, function(n){all.files[grepl(n[1], all.files) &
+                                                 grepl(n[2], all.files)]}))
+
+# generate simpler names
+sample.names <- sapply(samples, function(n){paste(n[1], n[2], sep = "_")})
+```
+
+##############
+## Read in samples and do batch correction
+##############
+
+```{r batch correction}
+# Read in data
+norm_data <- loadData(files)
+names(norm_data) <- sample.names
+
+# Calculate highly variable genes
+hvg_data <- getHVGs(norm_data)
+names(hvg_data) <- sample.names
+
+# Batch correction
+bc_data <- batchCorrect(norm_data, hvg_data)
+
+# Reset colnames
+for(i in 1:length(bc_data$corrected)) {
+			colnames(bc_data$corrected[[i]]) <- colnames(norm_data[[i]])
+}
+bc_data <- do.call("cbind", bc_data$corrected)
+```
+
+##############
+## Calculate tSNE 
+##############
+
+```{r tSNE}
+# tSNE
+set.seed(123)
+tsne <- Rtsne(t(bc_data))
+
+# VIsualize tSNE
+# Based on patient
+ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2],
+                  Patient = sapply(colnames(bc_data), function(n){unlist(strsplit(n, "_"))[1]}))) +
+  geom_point(aes(tsne1, tsne2, colour = Patient)) + 
+  scale_color_brewer(palette = "Set1")
+
+# Based on tissue
+ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2],
+                  Tissue = sapply(colnames(bc_data), function(n){unlist(strsplit(n, "_"))[3]}))) +
+  geom_point(aes(tsne1, tsne2, colour = Tissue)) + 
+  scale_color_brewer(palette = "Set2")
+```
+
+##############
+## Visualize marker genes
+##############
+
+```{r markers}
+# list of genes whose expression we would like to check in each tissue
+genesToPlot <- list( GC=c("MUC5AC", "TFF1", "GKN1", "GKN2", "MUC6", "TFF2", "PGA3", "PGA4", "PGA5", "PGC", "GIF", "GAST", "CHGA", "LIPF", "LYZ", "VIM"),
+			NE=c("KRT14", "TP63", "KRT5", "KRT13", "KRT4", "KRT3", "KRT7", "KRT6C", "KRT6B", "KRT8", "KRT19", "VIM"),
+			D2=c("SOX9", "ALPI", "GHRL", "GRHL1", "GRHL2", "GRHL3", "CCK", "SCT", "TRPM5", "DLL1", "OLFM4", "HES1", "BMI1", "DCLK1", "GFI1", "MSI1", "PROM1", "LYZ", "LGR5", "ASCL2", "TFF3", "REG4", "CHGA", "CA1", "CA2", "KRT20", "CEACAM1", "VIM"))
+
+# geneID to HGNC map
+geneMap <- read.table(paste0(patientFolders, "Patient3/Data/SIGAA5_NE/genes.tsv"), stringsAsFactors = FALSE)
+rownames(geneMap) <- geneMap[,1]
+
+data <- sapply(norm_data, function(x) log2(x+1))
+data <- do.call("cbind", data)
+
+# go through all genes
+plotlist <- list()
+for(i in names(genesToPlot)){
+  tmp <- list()
+  for(g in genesToPlot[[i]]){
+		# get the ensembl id for that gene
+		e <- geneMap[geneMap[,2]%in%g, 1]
+	
+		# reduce gene list to genes present in the data
+		if( e %in% row.names(data) ){	
+			# make df for plotting
+			toplot <- data.frame( tsne1=tsne$Y[,1], 
+						tsne2=tsne$Y[,2],	
+						norm_expr=data[e,],
+						gene=g)
+			tmp[[g]] <- ggplot(toplot, aes(x=tsne1, y=tsne2)) +
+						geom_point(aes(color=norm_expr), size=.5) +
+						background_grid(major="none", minor="none") +
+						xlab("t-SNE1") + ylab("t-SNE2") + ggtitle(g) +
+						theme( axis.line=element_blank(),
+							axis.text.x=element_blank(),
+							axis.text.y=element_blank(),
+							axis.ticks=element_blank(),
+							axis.title.x=element_blank(),
+							axis.title.y=element_blank(),
+							panel.background=element_blank(),
+							panel.border=element_blank(),
+							panel.grid.major=element_blank(),
+							panel.grid.minor=element_blank(),
+							plot.background=element_blank()) +
+						scale_color_viridis()
+	  }
+  }
+  if(length(tmp)>0){
+		#legend <- get_legend(tmp[[1]] + theme(legend.position="right"))
+		funcText <- paste0("plot_grid(", 
+					paste0("tmp[[", 1:length(tmp), "]]", collapse=", 
+					"), ", ncol=4)")
+		plotlist[[i]] <- eval( parse(text=funcText) )
+	}
+}
+
+# GC
+print(plotlist[["GC"]])
+
+# NE
+print(plotlist[["NE"]])
+
+# D2
+print(plotlist[["D2"]])
+```
+
+
+
+
