@@ -115,6 +115,37 @@ ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2],
 ```
 
 ##############
+## Visualize clusters of tissue comparisons
+##############
+
+```{r clusters}
+load("/Users/nils/Dropbox (Cambridge University)/Oesophagus_single_cell/Clustering/ByTissueClustering/clusters_byTissue.rdata")
+
+# Rename clusters
+for(i in names(clusters_byTissue)){
+  cur_clusters <- clusters_byTissue[[i]]
+  cur_newclusters <- paste(i, cur_clusters, sep = "_")
+  names(cur_newclusters) <- names(cur_clusters)
+  clusters_byTissue[[i]] <- cur_newclusters
+}
+
+# Merge clusters
+clusters <- unlist(clusters_byTissue)
+names(clusters) <- sapply(names(clusters), function(n){unlist(strsplit(n, "\\."))[2]})
+clusters <- clusters[colnames(bc_data)]
+
+colours <- c(brewer.pal(n = 9, name = "Set1"), 
+             brewer.pal(n = 8, name = "Set2"), 
+             brewer.pal(n = 12, name = "Set3"),
+             brewer.pal(n = 12, name = "Paired"))
+
+ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2],
+                  clusters = clusters)) +
+  geom_point(aes(tsne1, tsne2, colour = clusters)) + 
+  scale_color_manual(values = colours)
+```
+
+##############
 ## Visualize marker genes
 ##############
 
@@ -172,17 +203,44 @@ for(i in names(genesToPlot)){
 		plotlist[[i]] <- eval( parse(text=funcText) )
 	}
 }
+```
 
+```{r, fig.width=18, fig.height=18}
 # GC
 print(plotlist[["GC"]])
+```
 
+```{r, fig.width=18, fig.height==18}
 # NE
 print(plotlist[["NE"]])
+```
 
+```{r, fig.width=18, fig.height=22}
 # D2
 print(plotlist[["D2"]])
 ```
 
+##############
+## Hierarchical clustering of clusters
+##############
 
+```{r hierarchical_clustering}
+# Average expression within each cluster
+mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(bc_data))
+colnames(mat) <- unique(clusters)
+
+for(i in unique(clusters)){
+  mat[,i] <- rowMeans(bc_data[,clusters == i])
+}
+
+# Compute dendogram
+# Visualize dendrogram based on spearman correlation
+dend <- hclust(as.dist(sqrt(1 - cor(mat, method = "pearson"))/2), method = "ward.D2")
+plot(dend, hang=-1)
+
+# Visualize dendrogram based on euclidean distance
+dend <- hclust(dist(t(mat)), method = "ward.D2")
+plot(dend, hang=-1)
+```
 
 
