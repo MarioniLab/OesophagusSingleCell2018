@@ -16,13 +16,21 @@ knitr::opts_chunk$set(echo = TRUE)
 
 We loop trough the folders containing the filtered matrix files, barcodes and genenames to read in the data in form of SingleCellExperiment (sce) objects.
 
-```{r libraries}
+```{r libraries, message=FALSE}
 library(scran)
 library(scater)
 library(DropletUtils)
+library(ggplot2)
+library(Matrix)
+library(cowplot)
+library(openxlsx)
 ```
 
-```{r data}
+```{r additional_files}
+MT_genes <- read.table("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/MT_genes.txt", sep = "\t", header = TRUE)
+```
+
+```{r data, eval=FALSE}
 folders <- list.files("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Data/", full.names = TRUE)
 folder.names <- list.files("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Data/", full.names = FALSE)
 
@@ -41,4 +49,54 @@ for(i in 1:length(folders)){
 
 # Save list
 saveRDS(sce.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
+```
+
+Next we filter the cells based on several criteria. For this, we will plot these QC features first.
+
+```{r QC_metrics, eval=FALSE}
+sce.list <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
+for(i in sce.list){
+  i <- suppressMessages(calculateQCMetrics(i))
+  
+  # Library size
+  print(ggplot(as.data.frame(colData(i))) + 
+    geom_point(aes(1:ncol(i), log10(total_counts))) +
+    xlab("Cells"))
+  
+  # Number of genes detected
+  print(ggplot(as.data.frame(colData(i))) + 
+    geom_point(aes(1:ncol(i), total_features)) +
+    xlab("Cells"))
+  
+  # Mitochondrial genes
+  print(ggplot(data.frame(MT_genes = Matrix::colSums(counts(i)[rownames(i) %in%
+                                                           MT_genes$Gene.stable.ID,])/
+        Matrix::colSums(counts(i)))*100) +
+    geom_point(aes(1:ncol(i), MT_genes)) + 
+     ylab("% mitochondrial reads") + xlab("Cells"))
+  
+  # Marker gene expression
+  # VIM
+  print(ggplot(data.frame(VIM = log10(counts(i)["ENSG00000026025",] + 1))) +
+    geom_point(aes(1:ncol(i), VIM)) + xlab("Cells") +
+    ylab("log10[VIM]"))
+
+  # PTPRC
+  print(ggplot(data.frame(PTPRC = log10(counts(i)["ENSG00000081237",] + 1))) +
+    geom_point(aes(1:ncol(i), PTPRC)) + xlab("Cells") +
+    ylab("log10[VIM]"))
+}
+
+# Create xlsx file with entries for QC thresholds
+df <- data.frame(names = folder.names,
+           lower_total_counts = rep(0, length(folder.names)),
+           upper_total_counts = rep(0, length(folder.names)),
+           lower_total_features = rep(0, length(folder.names)),
+           upper_total_features = rep(0, length(folder.names)),
+           lower_mito = rep(0, length(folder.names)),
+           upper_mito = rep(0, length(folder.names)),
+           VIM = rep(0, length(folder.names)),
+           PTPRC = rep(0, length(folder.names)))
+
+write.xlsx(df, "QC_metrics.xlsx")
 ```
