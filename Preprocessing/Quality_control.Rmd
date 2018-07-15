@@ -6,6 +6,8 @@ output:
   html_document:
     toc: true
     toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Reports/Filtering.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -53,7 +55,7 @@ saveRDS(sce.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cel
 
 Next we filter the cells based on several criteria. For this, we will plot these QC features first.
 
-```{r QC_metrics, eval=FALSE}
+```{r QC_metrics}
 sce.list <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
 for(i in sce.list){
   i <- suppressMessages(calculateQCMetrics(i))
@@ -98,5 +100,5 @@ df <- data.frame(names = folder.names,
            VIM = rep(0, length(folder.names)),
            PTPRC = rep(0, length(folder.names)))
 
-write.xlsx(df, "QC_metrics.xlsx")
+write.xlsx(df, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/QC_metrics.xlsx")
 ```
