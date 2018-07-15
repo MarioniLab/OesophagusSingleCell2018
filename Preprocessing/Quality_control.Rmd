@@ -29,7 +29,7 @@ library(openxlsx)
 ```
 
 ```{r additional_files}
-MT_genes <- read.table("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/MT_genes.txt", sep = "\t", header = TRUE)
+MT_genes <- read.table("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/MT_genes.txt", sep = "\t", header = TRUE)
 ```
 
 ```{r data, eval=FALSE}
@@ -90,15 +90,15 @@ for(i in sce.list){
 }
 
 # Create xlsx file with entries for QC thresholds
-df <- data.frame(names = folder.names,
-           lower_total_counts = rep(0, length(folder.names)),
-           upper_total_counts = rep(0, length(folder.names)),
-           lower_total_features = rep(0, length(folder.names)),
-           upper_total_features = rep(0, length(folder.names)),
-           lower_mito = rep(0, length(folder.names)),
-           upper_mito = rep(0, length(folder.names)),
-           VIM = rep(0, length(folder.names)),
-           PTPRC = rep(0, length(folder.names)))
+df <- data.frame(names = names(sce.list),
+           lower_total_counts = rep(0, length(sce.list)),
+           upper_total_counts = rep(0, length(sce.list)),
+           lower_total_features = rep(0, length(sce.list)),
+           upper_total_features = rep(0, length(sce.list)),
+           lower_mito = rep(0, length(sce.list)),
+           upper_mito = rep(0, length(sce.list)),
+           VIM = rep(0, length(sce.list)),
+           PTPRC = rep(0, length(sce.list)))
 
 write.xlsx(df, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/QC_metrics.xlsx")
 ```
