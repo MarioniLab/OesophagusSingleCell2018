@@ -14,13 +14,31 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Read in the data
 
-We loop trough the folders containing the filtered matrix files, barcodes and genenames to read in the data in form of SingleCellExperiment objects.
+We loop trough the folders containing the filtered matrix files, barcodes and genenames to read in the data in form of SingleCellExperiment (sce) objects.
 
 ```{r libraries}
 library(scran)
 library(scater)
+library(DropletUtils)
 ```
 
 ```{r data}
+folders <- list.files("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Data/", full.names = TRUE)
+folder.names <- list.files("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Data/", full.names = FALSE)
 
+# List to store sce objects
+sce.list <- list()
+
+# Read in the data
+for(i in 1:length(folders)){
+  cur_sce <- read10xCounts(folders[i])
+  colData(cur_sce)$Patient <- as.character(sapply(folder.names, 
+                                         function(n){unlist(strsplit(n, "_"))[1]})[i])
+  colData(cur_sce)$Tissue <- as.character(sapply(folder.names, 
+                                        function(n){unlist(strsplit(n, "_"))[3]})[i])
+  sce.list[[folder.names[i]]] <- cur_sce
+}
+
+# Save list
+saveRDS(sce.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
 ```
