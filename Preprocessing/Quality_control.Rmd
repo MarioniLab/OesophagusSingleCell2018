@@ -105,6 +105,8 @@ df <- data.frame(names = names(sce.list),
            PTPRC = rep(0, length(sce.list)))
 
 write.xlsx(df, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/QC_metrics.xlsx")
+
+saveRDS(sce.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
 ```
 
 # Removal of low-quality cells
@@ -115,7 +117,40 @@ Here we remove cells based on the filtering thresholds defined by visualizing th
 QC_thresholds <- read.xlsx("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/QC_metrics_edited.xlsx")
 
 for(i in 1:length(sce.list)){
+  cur_sce <- sce.list[[i]]
   
+  # Total counts 
+  cur_sce <- cur_sce[,log10(colData(cur_sce)$total_counts) >
+                       QC_thresholds[i,"lower_total_counts"] &
+                       log10(colData(cur_sce)$total_counts) <
+                       QC_thresholds[i,"upper_total_counts"]]
+  
+  # Total features 
+  cur_sce <- cur_sce[,colData(cur_sce)$total_features >
+                       QC_thresholds[i,"lower_total_features"] &
+                       colData(cur_sce)$total_features <
+                       QC_thresholds[i,"upper_total_features"]]
+  
+  # Mitochondria 
+  cur_sce <- cur_sce[,(Matrix::colSums(counts(cur_sce)[rownames(cur_sce) %in%
+                MT_genes$Gene.stable.ID,])/Matrix::colSums(counts(cur_sce)))*100 >
+                       QC_thresholds[i,"lower_mito"] &
+                       (Matrix::colSums(counts(cur_sce)[rownames(cur_sce) %in%
+                MT_genes$Gene.stable.ID,])/Matrix::colSums(counts(cur_sce)))*100 <
+                       QC_thresholds[i,"upper_mito"]]
+  
+  # VIM
+  if(!is.na(QC_thresholds[i,"VIM"])){
+    cur_sce <- cur_sce[,counts(cur_sce)["ENSG00000026025",] <=
+                         QC_thresholds[i,"VIM"]]
+  }
+  
+  # PTPRC
+  cur_sce <- cur_sce[,counts(cur_sce)["ENSG00000081237",] <=
+                         QC_thresholds[i,"PTPRC"]]
+  
+  sce.list[[i]] <- cur_sce
 }
 
+saveRDS(sce.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
 ```
