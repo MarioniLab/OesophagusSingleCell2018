@@ -53,39 +53,43 @@ for(i in 1:length(folders)){
 saveRDS(sce.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
 ```
 
+# Plot QC features
+
 Next we filter the cells based on several criteria. For this, we will plot these QC features first.
 
 ```{r QC_metrics}
 sce.list <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
-for(i in sce.list){
-  i <- suppressMessages(calculateQCMetrics(i))
+for(i in 1:length(sce.list)){
+  cur_sce <- sce.list[[i]]
+  cur_sce <- suppressMessages(calculateQCMetrics(cur_sce))
+  sce.list[[i]] <- cur_sce
   
   # Library size
-  print(ggplot(as.data.frame(colData(i))) + 
-    geom_point(aes(1:ncol(i), log10(total_counts))) +
+  print(ggplot(as.data.frame(colData(cur_sce))) + 
+    geom_point(aes(1:ncol(cur_sce), log10(total_counts))) +
     xlab("Cells"))
   
   # Number of genes detected
-  print(ggplot(as.data.frame(colData(i))) + 
-    geom_point(aes(1:ncol(i), total_features)) +
+  print(ggplot(as.data.frame(colData(cur_sce))) + 
+    geom_point(aes(1:ncol(cur_sce), total_features)) +
     xlab("Cells"))
   
   # Mitochondrial genes
-  print(ggplot(data.frame(MT_genes = Matrix::colSums(counts(i)[rownames(i) %in%
+  print(ggplot(data.frame(MT_genes = Matrix::colSums(counts(cur_sce)[rownames(cur_sce) %in%
                                                            MT_genes$Gene.stable.ID,])/
-        Matrix::colSums(counts(i)))*100) +
-    geom_point(aes(1:ncol(i), MT_genes)) + 
+        Matrix::colSums(counts(cur_sce)))*100) +
+    geom_point(aes(1:ncol(cur_sce), MT_genes)) + 
      ylab("% mitochondrial reads") + xlab("Cells"))
   
   # Marker gene expression
   # VIM
-  print(ggplot(data.frame(VIM = log10(counts(i)["ENSG00000026025",] + 1))) +
-    geom_point(aes(1:ncol(i), VIM)) + xlab("Cells") +
+  print(ggplot(data.frame(VIM = log10(counts(cur_sce)["ENSG00000026025",] + 1))) +
+    geom_point(aes(1:ncol(cur_sce), VIM)) + xlab("Cells") +
     ylab("log10[VIM]"))
 
   # PTPRC
-  print(ggplot(data.frame(PTPRC = log10(counts(i)["ENSG00000081237",] + 1))) +
-    geom_point(aes(1:ncol(i), PTPRC)) + xlab("Cells") +
+  print(ggplot(data.frame(PTPRC = log10(counts(cur_sce)["ENSG00000081237",] + 1))) +
+    geom_point(aes(1:ncol(cur_sce), PTPRC)) + xlab("Cells") +
     ylab("log10[VIM]"))
 }
 
@@ -101,4 +105,17 @@ df <- data.frame(names = names(sce.list),
            PTPRC = rep(0, length(sce.list)))
 
 write.xlsx(df, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/QC_metrics.xlsx")
+```
+
+# Removal of low-quality cells
+
+Here we remove cells based on the filtering thresholds defined by visualizing the QC features.
+
+```{r filtering}
+QC_thresholds <- read.xlsx("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/QC_metrics_edited.xlsx")
+
+for(i in 1:length(sce.list)){
+  
+}
+
 ```
