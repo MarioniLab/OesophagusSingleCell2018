@@ -1,0 +1,46 @@
+---
+title: "Normalization"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Reports/Normalization.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Read in the data
+
+```{r libraries, message=FALSE}
+library(scran)
+library(scater)
+```
+
+We use the filtered data to perform normalization.
+
+```{r data, eval=FALSE}
+sce.list <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
+
+for(i in 1:length(sce.list)){
+  cur_sce <- sce.list[[i]]
+  
+  if("logcounts" %in% names(cur_sce@assays$data)){next}
+  
+  clusters <- quickCluster(cur_sce, method = "igraph", irlba.args = c("work" = 100), 
+                         max.size = 2000, min.size = 50)
+
+  cur_sce <- computeSumFactors(cur_sce, clusters=clusters)
+
+  cur_sce <- normalize(cur_sce, return_log = TRUE)
+  
+  sce.list[[i]] <- cur_sce
+}
+
+saveRDS(sce.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
+```
+
