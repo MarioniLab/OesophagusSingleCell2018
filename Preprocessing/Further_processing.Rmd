@@ -19,6 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r libraries, message=FALSE}
 library(scran)
 library(scater)
+library(openxlsx)
 source("../Analysis/Functions/auxiliary.R")
 ```
 
@@ -45,7 +46,8 @@ for(i in 1:length(sce.list)){
 
   # Marker genes
   markers <- marker.detection(cur_sce, clusters = cluster)
-
+  write.xlsx(markers, paste("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/Single_sample/", 
+                            names(sce.list)[i], "/Marker_genes.xlsx", sep = ""))
 }
 
 saveRDS(sce.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
