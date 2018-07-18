@@ -19,26 +19,33 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r libraries, message=FALSE}
 library(scran)
 library(scater)
+source("../Analysis/Functions/auxiliary.R")
 ```
 
-We use the filtered data to perform normalization.
+Here, we compute tSNEs, perform clustering and detect marker genes
 
 ```{r data, eval=FALSE}
 sce.list <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
 
 for(i in 1:length(sce.list)){
   cur_sce <- sce.list[[i]]
-  
-  if("logcounts" %in% names(cur_sce@assays$data)){next}
-  
-  clusters <- quickCluster(cur_sce, method = "igraph", irlba.args = c("work" = 100), 
-                         max.size = 2000, min.size = 50)
 
-  cur_sce <- computeSumFactors(cur_sce, clusters=clusters)
-
-  cur_sce <- normalize(cur_sce, return_log = TRUE)
+  # tSNE
+  if(!("TSNE" %in% reducedDimNames(cur_sce))){
+    set.seed(1234)
+    cur_sce <- runTSNE(cur_sce)
+  }
   
-  sce.list[[i]] <- cur_sce
+  # Clustering
+  if(!("Clusters" %in% names(colData(cur_sce)))){
+    HVgenes <- HVG(cur_sce)
+    cluster <- DTC(cur_sce, HVgenes)
+    colData(cur_sce)$Clusters <- cluster
+  }
+
+  # Marker genes
+  markers <- marker.detection(cur_sce, clusters = cluster)
+
 }
 
 saveRDS(sce.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
