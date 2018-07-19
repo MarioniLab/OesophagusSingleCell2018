@@ -48,8 +48,21 @@ for(i in 1:length(sce.list)){
   markers <- marker.detection(cur_sce, clusters = cluster)
   write.xlsx(markers, paste("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/Single_sample/", 
                             names(sce.list)[i], "/Marker_genes.xlsx", sep = ""))
+
+  sce.list[[i]] <- cur_sce
 }
 
 saveRDS(sce.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
+```
+
+# Removing lower quality libraries
+
+For further downstream analysis, we exclude lower quality samples.
+
+```{r exclude-samples}
+QC <- read.xlsx("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/Library_quality.xlsx")
+sce.good <- sce.list[QC$names[QC$good_quality == "yes"]]
+
+saveRDS(sce.good, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/High_quality_sce.rds")
 ```
 
