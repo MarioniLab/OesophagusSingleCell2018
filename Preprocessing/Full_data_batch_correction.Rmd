@@ -1,0 +1,104 @@
+---
+title: "Batch correction across tissues and patients"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/Full_data_batch_correction.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Read in the data
+
+```{r libraries, message=FALSE}
+library(scran)
+library(scater)
+library(DropletUtils)
+library(openxlsx)
+library(Rtsne)
+source("../Analysis/Functions/auxiliary.R")
+```
+
+# Batch correction across tissues
+
+```{r batch-correction}
+sce.list <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/High_quality_sce.rds")
+
+sce.list <- lapply(sce.list, function(n){
+    rowData(n) <- rowData(n)[,1:3]
+    n
+  })
+
+# Order sce objects for batch correction
+order.names <- c("Patient2_SIGAD9_GOJ", "Patient8_SIGAE7_GOJ", "Patient10_SIGAB5_GOJ",
+                 "Patient3_SIGAB5_SCJ", "Patient7_SIGAB4_SCJ", "Patient9_SIGAE9_SCJ",
+                 "Patient10_SIGAA5_NE", "Patient2_SIGAC9_NE", "Patient7_SIGAA4_NE",
+                 "Patient8_SIGAD7_NE", "Patient2_SIGAE9_GC", "Patient3_SIGAD5_GC",
+                 "Patient7_SIGAD4_GC", "Patient12_SIGAD3_GC", "Patient3_SIGAC5_BE",
+                 "Patient7_SIGAC4_BE", "Patient9_SIGAF9_BE", "Patient12_SIGAC3_BE",
+                 "Patient7_SIGAE4_D2", "Patient8_SIGAG7_D2", "Patient9_SIGAH9_D2",
+                 "Patient12_SIGAE3_D2", "Patient10_SIGAD5_SMG", "Patient11_SIGAA4_SMG")
+
+sce.list <- sce.list[order.names]
+
+# Combine sce objects
+sce <- do.call("cbind", sce.list)
+sce <- normalize(sce)
+  
+# Batch correction
+corrected <- batch.correction(sce)
+  
+# Save batch corrected counts in metdata
+metadata(tissue_sce)$corrected <- corrected
+  
+# Compute tsne on corrected counts
+set.seed(1234)
+tsne <- Rtsne(t(corrected))
+  
+# Store tsne in slot
+reducedDims(tissue_sce)$TSNE <- tsne$Y[,1:2]
+
+# Clustering on corrected data
+dist.all <- as.dist(sqrt((1 - cor(as.matrix(corrected), 
+                                    method = "spearman"))/2))
+dendro <- hclust(dist.all, method = "ward.D2")
+cluster <- as.character(cutreeDynamic(dendro = dendro, distM = as.matrix(dist.all), 
+                      minClusterSize = 10, deepSplit = 0))
+  
+# Save clustering in new slot
+colData(tissue_sce)$Tissue_cluster <- cluster
+  
+# Visualize whether populations are patient specific 
+table(cluster, colData(tissue_sce)$Patient)
+  
+# Perform differential expression
+des <- model.matrix(~colData(tissue_sce)$Patient)
+markers <- findMarkers(tissue_sce, clusters = cluster, design = des)
+  
+markers.spec <- lapply(markers, function(n){
+  if(!is.na(n$Top[1])){
+  cur_n <- n[n$FDR < 0.1 & apply(n[,3:ncol(n)], 1, function(x){sum(x > 0)}) == ncol(n) - 2,]
+    if(nrow(cur_n) > 0){
+      cur_n$GeneName <- rowData(tissue_sce)$Symbol[match(rownames(cur_n), rowData(tissue_sce)$ID)]
+    }
+  }
+  else{
+    cur_n <- NULL
+  }
+  cur_n
+})
+  
+write.xlsx(markers.spec, paste("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/Tissues/", i, "/Marker_genes.xlsx", sep = ""))
+  
+tissue.list[[i]] <- tissue_sce
+}
+
+saveRDS(tissue.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Tissue_sce.rds")
+```
+
