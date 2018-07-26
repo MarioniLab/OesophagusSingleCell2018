@@ -52,40 +52,49 @@ sce <- do.call("cbind", sce.list)
 sce <- normalize(sce)
   
 # Batch correction
-corrected <- batch.correction(sce)
+corrected <- batch.correction(sce.list)
   
 # Save batch corrected counts in metdata
-metadata(tissue_sce)$corrected <- corrected
+metadata(sce)$corrected <- corrected
   
 # Compute tsne on corrected counts
 set.seed(1234)
 tsne <- Rtsne(t(corrected))
   
 # Store tsne in slot
-reducedDims(tissue_sce)$TSNE <- tsne$Y[,1:2]
+reducedDims(sce)$TSNE <- tsne$Y[,1:2]
 
 # Clustering on corrected data
-dist.all <- as.dist(sqrt((1 - cor(as.matrix(corrected), 
-                                    method = "spearman"))/2))
-dendro <- hclust(dist.all, method = "ward.D2")
-cluster <- as.character(cutreeDynamic(dendro = dendro, distM = as.matrix(dist.all), 
-                      minClusterSize = 10, deepSplit = 0))
+g <- buildSNNGraph(corrected, k = 10, pc.approx = TRUE)
+clusters <- igraph::cluster_louvain(g)$membership
+
+# Visualize clustering
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  clusters = as.factor(clusters))) + geom_point(aes(tSNE1, tSNE2, colour = clusters))
+
+# Tissue
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  clusters = as.factor(colData(sce)$Tissue))) + geom_point(aes(tSNE1, tSNE2, colour = clusters))
+
+# Patient
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  clusters = as.factor(colData(sce)$Patient))) + geom_point(aes(tSNE1, tSNE2, colour = clusters))
   
 # Save clustering in new slot
-colData(tissue_sce)$Tissue_cluster <- cluster
-  
-# Visualize whether populations are patient specific 
-table(cluster, colData(tissue_sce)$Patient)
+colData(sce)$Global_cluster <- clusters
   
 # Perform differential expression
-des <- model.matrix(~colData(tissue_sce)$Patient)
-markers <- findMarkers(tissue_sce, clusters = cluster, design = des)
+des <- model.matrix(~colData(sce)$Patient+colData(sce)$Tissue)
+markers <- findMarkers(sce, clusters = clusters, design = des)
   
 markers.spec <- lapply(markers, function(n){
   if(!is.na(n$Top[1])){
   cur_n <- n[n$FDR < 0.1 & apply(n[,3:ncol(n)], 1, function(x){sum(x > 0)}) == ncol(n) - 2,]
     if(nrow(cur_n) > 0){
-      cur_n$GeneName <- rowData(tissue_sce)$Symbol[match(rownames(cur_n), rowData(tissue_sce)$ID)]
+      cur_n$GeneName <- rowData(sce)$Symbol[match(rownames(cur_n), rowData(sce)$ID)]
     }
   }
   else{
@@ -94,11 +103,8 @@ markers.spec <- lapply(markers, function(n){
   cur_n
 })
   
-write.xlsx(markers.spec, paste("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/Tissues/", i, "/Marker_genes.xlsx", sep = ""))
-  
-tissue.list[[i]] <- tissue_sce
-}
+write.xlsx(markers.spec, paste("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/Global/", i, "/Marker_genes.xlsx", sep = ""))
 
-saveRDS(tissue.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Tissue_sce.rds")
+saveRDS(sce, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
