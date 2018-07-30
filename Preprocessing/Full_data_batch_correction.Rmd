@@ -108,3 +108,25 @@ write.xlsx(markers.spec, paste("../../../Dropbox (Cambridge University)/Oesophag
 saveRDS(sce, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
+# Add tissue clutsering to batch corrected data
+
+```{r}
+all_sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+tissue_sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Tissue_sce.rds")
+
+tissue.clusters <- vector(length = ncol(all_sce))
+names(tissue.clusters) <- paste(colData(all_sce)$Barcode, 
+                                colData(all_sce)$Patient,
+                                colData(all_sce)$Tissue, sep = "_")
+
+for(i in 1:length(tissue_sce)){
+  tissue.clusters[paste(colData(tissue_sce[[i]])$Barcode, 
+                                colData(tissue_sce[[i]])$Patient,
+                                colData(tissue_sce[[i]])$Tissue, sep = "_")] <- colData(tissue_sce[[i]])$Tissue_cluster
+}
+
+colData(all_sce)$Tissue_cluster <- tissue.clusters
+
+saveRDS(all_sce, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+```
+
