@@ -88,7 +88,7 @@ colData(sce)$Global_cluster <- clusters
   
 # Perform differential expression
 des <- model.matrix(~colData(sce)$Patient+colData(sce)$Tissue)
-markers <- findMarkers(sce, clusters = clusters, design = des)
+markers <- findMarkers(sce, clusters = colData(sce)$Global_cluster, design = des)
   
 markers.spec <- lapply(markers, function(n){
   if(!is.na(n$Top[1])){
@@ -103,7 +103,7 @@ markers.spec <- lapply(markers, function(n){
   cur_n
 })
   
-write.xlsx(markers.spec, paste("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/Global/", i, "/Marker_genes.xlsx", sep = ""))
+write.xlsx(markers.spec, paste("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/Global/Marker_genes.xlsx", sep = ""))
 
 saveRDS(sce, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```

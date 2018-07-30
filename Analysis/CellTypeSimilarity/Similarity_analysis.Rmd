@@ -1,11 +1,13 @@
 ---
-title: "Cell type similarities"
+title: "Similarity analysis"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
   html_document:
     toc: true
     toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/Similarity_analysis.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -15,5 +17,39 @@ knitr::opts_chunk$set(echo = TRUE)
 # Read in data
 
 ```{r}
+suppressMessages(library(clustree))
+suppressMessages(library(scater))
+library(RColorBrewer)
+library(pheatmap)
+sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+```
 
+# Calculate normal dendrogram on averaged counts
+
+```{r, fig.width=12}
+clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
+mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(metadata(sce)$corrected))
+colnames(mat) <- unique(clusters)
+
+for(i in unique(clusters)){
+  mat[,i] <- rowMeans(metadata(sce)$corrected[,clusters == i])
+}
+
+# Compute dendogram
+# Visualize dendrogram based on spearman correlation
+dend <- hclust(as.dist(sqrt(1 - cor(mat, method = "pearson"))/2), method = "ward.D2")
+plot(dend, hang=-1)
+
+pheatmap(mat[1:2,], cluster_rows = FALSE, 
+         clustering_distance_cols = as.dist(sqrt(1 - cor(mat, method = "pearson"))/2), 
+         clustering_method = "ward.D2", cellheight = 1, 
+         annotation_col = data.frame(row.names = colnames(mat),
+                                     tissue = sub("_.*", "", colnames(mat))),
+         annotation_colors = list(tissue = c("NE" = brewer.pal(12, "Set3")[1],
+                                             "BE" = brewer.pal(12, "Set3")[2],
+                                             "SCJ" = brewer.pal(12, "Set3")[3],
+                                             "GOJ" = brewer.pal(12, "Set3")[4],
+                                             "GC" = brewer.pal(12, "Set3")[5],
+                                             "SMG" = brewer.pal(12, "Set3")[6],
+                                             "D2" = brewer.pal(12, "Set3")[7])))
 ```
