@@ -19,6 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r libraries, message=FALSE}
 library(scran)
 library(scater)
+library(ggplot2)
 library(DropletUtils)
 library(openxlsx)
 library(Rtsne)
@@ -37,6 +38,10 @@ for(i in c("NE", "GC", "BE", "GOJ", "SCJ", "D2", "SMG")){
     rowData(n) <- rowData(n)[,1:3]
     n
   })
+  
+  # Order sce object by size
+  cur_sces <- cur_sces[order(unlist(lapply(cur_sces, ncol)), decreasing = TRUE)]
+  
   # Combine sce objects
   tissue_sce <- do.call("cbind", cur_sces)
   tissue_sce <- normalize(tissue_sce)
@@ -55,11 +60,13 @@ for(i in c("NE", "GC", "BE", "GOJ", "SCJ", "D2", "SMG")){
   reducedDims(tissue_sce)$TSNE <- tsne$Y[,1:2]
 
   # Clustering on corrected data
-  dist.all <- as.dist(sqrt((1 - cor(as.matrix(corrected), 
-                                      method = "spearman"))/2))
-  dendro <- hclust(dist.all, method = "ward.D2")
-  cluster <- as.character(cutreeDynamic(dendro = dendro, distM = as.matrix(dist.all), 
-                        minClusterSize = 10, deepSplit = 0))
+  #dist.all <- as.dist(sqrt((1 - cor(as.matrix(corrected), 
+  #                                    method = "spearman"))/2))
+  #dendro <- hclust(dist.all, method = "ward.D2")
+  #cluster <- as.character(cutreeDynamic(dendro = dendro, distM = as.matrix(dist.all), 
+  #                      minClusterSize = 10, deepSplit = 0))
+  g <- buildSNNGraph(corrected, k = 10, pc.approx = TRUE)
+  cluster <- igraph::cluster_louvain(g)$membership
   
   # Save clustering in new slot
   colData(tissue_sce)$Tissue_cluster <- cluster
@@ -88,6 +95,17 @@ for(i in c("NE", "GC", "BE", "GOJ", "SCJ", "D2", "SMG")){
   
   tissue.list[[i]] <- tissue_sce
 }
+
+# Visualize clustering
+ggplot(data.frame(tSNE1 = reducedDims(tissue.list$BE)$TSNE[,1],
+                  tSNE2 = reducedDims(tissue.list$BE)$TSNE[,2],
+                  clusters = as.factor(colData(tissue.list$BE)$Tissue_cluster))) +
+  geom_point(aes(tSNE1, tSNE2, colour = clusters))
+
+ggplot(data.frame(tSNE1 = reducedDims(tissue.list$BE)$TSNE[,1],
+                  tSNE2 = reducedDims(tissue.list$BE)$TSNE[,2],
+                  clusters = as.factor(colData(tissue.list$BE)$Patient))) +
+  geom_point(aes(tSNE1, tSNE2, colour = clusters))
 
 saveRDS(tissue.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Tissue_sce.rds")
 ```
