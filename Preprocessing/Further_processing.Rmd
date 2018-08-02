@@ -38,14 +38,34 @@ for(i in 1:length(sce.list)){
   }
   
   # Clustering
-  if(!("Clusters" %in% names(colData(cur_sce)))){
+  #if(!("Clusters" %in% names(colData(cur_sce)))){
     HVgenes <- HVG(cur_sce)
-    cluster <- DTC(cur_sce, HVgenes)
+    g <- buildSNNGraph(logcounts(cur_sce)[HVgenes,], k = 10, pc.approx = TRUE)
+    cluster <- igraph::cluster_louvain(g)$membership
     colData(cur_sce)$Clusters <- cluster
-  }
+  #}
 
   # Marker genes
-  markers <- marker.detection(cur_sce, clusters = colData(cur_sce)$Clusters)
+  if(length(table(cluster)) == 1){next}
+  else if(length(table(cluster)) < 3){
+    cur_markers <- findMarkers(cur_sce, cluster)
+    markers <- lapply(cur_markers, function(n){
+      if(!is.na(n$Top[1])){
+        cur_n <- n[n$FDR < 0.1 & n[,3] > 0,]
+        if(nrow(cur_n) > 0){
+          cur_n$GeneName <- rowData(cur_sce)$Symbol[match(rownames(cur_n), rowData(cur_sce)$ID)]
+        }
+      }
+      else{
+          cur_n <- NULL
+      }
+      cur_n
+    })
+  }
+  else{
+    markers <- marker.detection(cur_sce, clusters = colData(cur_sce)$Clusters)
+  }
+
   write.xlsx(markers, paste("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/Single_sample/", 
                             names(sce.list)[i], "/Marker_genes.xlsx", sep = ""))
 
