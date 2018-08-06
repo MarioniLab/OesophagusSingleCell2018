@@ -43,7 +43,8 @@ order.names <- c("Patient2_SIGAD9_GOJ", "Patient8_SIGAE7_GOJ", "Patient10_SIGAB5
                  "Patient7_SIGAD4_GC", "Patient12_SIGAD3_GC", "Patient3_SIGAC5_BE",
                  "Patient7_SIGAC4_BE", "Patient9_SIGAF9_BE", "Patient12_SIGAC3_BE",
                  "Patient7_SIGAE4_D2", "Patient8_SIGAG7_D2", "Patient9_SIGAH9_D2",
-                 "Patient12_SIGAE3_D2", "Patient10_SIGAD5_SMG", "Patient11_SIGAA4_SMG")
+                 "Patient12_SIGAE3_D2", "Patient10_SIGAD5_SMG", "Patient11_SIGAA4_SMG",
+                 "Patient13_SIGAC8_SMG", "Patient13_SIGAD8_GOJ", "Patient13_SIGAE8_GC")
 
 sce.list <- sce.list[order.names]
 

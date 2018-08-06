@@ -97,14 +97,14 @@ for(i in c("NE", "GC", "BE", "GOJ", "SCJ", "D2", "SMG")){
 }
 
 # Visualize clustering
-ggplot(data.frame(tSNE1 = reducedDims(tissue.list$NE)$TSNE[,1],
-                  tSNE2 = reducedDims(tissue.list$NE)$TSNE[,2],
-                  clusters = as.factor(colData(tissue.list$NE)$Tissue_cluster))) +
+ggplot(data.frame(tSNE1 = reducedDims(tissue.list$GOJ)$TSNE[,1],
+                  tSNE2 = reducedDims(tissue.list$GOJ)$TSNE[,2],
+                  clusters = as.factor(colData(tissue.list$GOJ)$Tissue_cluster))) +
   geom_point(aes(tSNE1, tSNE2, colour = clusters))
 
-ggplot(data.frame(tSNE1 = reducedDims(tissue.list$NE)$TSNE[,1],
-                  tSNE2 = reducedDims(tissue.list$NE)$TSNE[,2],
-                  clusters = as.factor(colData(tissue.list$NE)$Patient))) +
+ggplot(data.frame(tSNE1 = reducedDims(tissue.list$GOJ)$TSNE[,1],
+                  tSNE2 = reducedDims(tissue.list$GOJ)$TSNE[,2],
+                  clusters = as.factor(colData(tissue.list$GOJ)$Patient))) +
   geom_point(aes(tSNE1, tSNE2, colour = clusters))
 
 saveRDS(tissue.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Tissue_sce.rds")
