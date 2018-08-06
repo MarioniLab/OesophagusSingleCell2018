@@ -54,7 +54,7 @@ for(i in c("NE", "GC", "BE", "GOJ", "SCJ", "D2", "SMG")){
   
   # Compute tsne on corrected counts
   set.seed(1234)
-  tsne <- Rtsne(t(corrected))
+  tsne <- Rtsne(t(corrected), pca = FALSE)
   
   # Store tsne in slot
   reducedDims(tissue_sce)$TSNE <- tsne$Y[,1:2]
@@ -65,7 +65,7 @@ for(i in c("NE", "GC", "BE", "GOJ", "SCJ", "D2", "SMG")){
   #dendro <- hclust(dist.all, method = "ward.D2")
   #cluster <- as.character(cutreeDynamic(dendro = dendro, distM = as.matrix(dist.all), 
   #                      minClusterSize = 10, deepSplit = 0))
-  g <- buildSNNGraph(corrected, k = 10, pc.approx = TRUE)
+  g <- buildSNNGraph(corrected, k = 10)
   cluster <- igraph::cluster_louvain(g)$membership
   
   # Save clustering in new slot
@@ -97,14 +97,14 @@ for(i in c("NE", "GC", "BE", "GOJ", "SCJ", "D2", "SMG")){
 }
 
 # Visualize clustering
-ggplot(data.frame(tSNE1 = reducedDims(tissue.list$BE)$TSNE[,1],
-                  tSNE2 = reducedDims(tissue.list$BE)$TSNE[,2],
-                  clusters = as.factor(colData(tissue.list$BE)$Tissue_cluster))) +
+ggplot(data.frame(tSNE1 = reducedDims(tissue.list$NE)$TSNE[,1],
+                  tSNE2 = reducedDims(tissue.list$NE)$TSNE[,2],
+                  clusters = as.factor(colData(tissue.list$NE)$Tissue_cluster))) +
   geom_point(aes(tSNE1, tSNE2, colour = clusters))
 
-ggplot(data.frame(tSNE1 = reducedDims(tissue.list$BE)$TSNE[,1],
-                  tSNE2 = reducedDims(tissue.list$BE)$TSNE[,2],
-                  clusters = as.factor(colData(tissue.list$BE)$Patient))) +
+ggplot(data.frame(tSNE1 = reducedDims(tissue.list$NE)$TSNE[,1],
+                  tSNE2 = reducedDims(tissue.list$NE)$TSNE[,2],
+                  clusters = as.factor(colData(tissue.list$NE)$Patient))) +
   geom_point(aes(tSNE1, tSNE2, colour = clusters))
 
 saveRDS(tissue.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Tissue_sce.rds")
