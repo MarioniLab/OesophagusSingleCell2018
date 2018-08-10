@@ -95,3 +95,25 @@ ggplot(data.frame(PC1 = corrected[3,],
 PCA does not resolve the substructure
 
 ## tSNE
+
+```{r}
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE)
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  tissue = colData(sce)$Tissue,
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = tissue))
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) +
+  geom_point(aes(x = tsne1, y = tsne2, colour = OLFM4)) + scale_colour_viridis()
+
+# Number of OLFM4 expressing cells in GC and BE
+length(which(logcounts(sce)[rowData(sce)$Symbol == "OLFM4",
+                            colData(sce)$Tissue == "GC"] > 0))
+length(which(logcounts(sce)[rowData(sce)$Symbol == "OLFM4",
+                            colData(sce)$Tissue == "BE"] > 0))
+```
