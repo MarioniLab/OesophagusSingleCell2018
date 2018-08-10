@@ -21,6 +21,8 @@ library(scran)
 library(Rtsne)
 library(ggplot2)
 library(viridis)
+library(monocle)
+library(plot3Drgl)
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 
 # Select only GC and BE
@@ -111,9 +113,59 @@ ggplot(data.frame(tsne1 = tsne$Y[,1],
                   OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) +
   geom_point(aes(x = tsne1, y = tsne2, colour = OLFM4)) + scale_colour_viridis()
 
+```
+
+
+## Monocle
+
+```{r}
+# Build monocle object
+cur_pd <- as.data.frame(colData(sce))
+rownames(cur_pd) <- colnames(corrected)
+pd <- new("AnnotatedDataFrame", data = cur_pd)
+#fd <- new("AnnotatedDataFrame", data = data.frame(gene_short_name = paste("PC", 1:50, sep = "")))
+cds <- newCellDataSet(corrected, phenoData = pd)
+
+# cluster cells
+cds <- clusterCells(cds)
+
+cds <- estimateSizeFactors(cds)
+cds <- reduceDimension(cds, max_components = 2,
+    method = 'DDRTree')
+cds <- orderCells(cds)
+
+plot_cell_trajectory(cds, color_by = "Tissue")
+
+ggplot(data.frame(tsne1 = cds@reducedDimS[1,],
+                  tsne2 = cds@reducedDimS[2,],
+                  OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) +
+  geom_point(aes(x = tsne1, y = tsne2, colour = OLFM4)) + scale_colour_viridis()
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
 # Number of OLFM4 expressing cells in GC and BE
 length(which(logcounts(sce)[rowData(sce)$Symbol == "OLFM4",
                             colData(sce)$Tissue == "GC"] > 0))
 length(which(logcounts(sce)[rowData(sce)$Symbol == "OLFM4",
                             colData(sce)$Tissue == "BE"] > 0))
+
+# Only visualize the OLFM4 positive cells
+tsne_red <- tsne$Y[logcounts(sce)[rowData(sce)$Symbol == "OLFM4",] > 0,]
+sce_red <- sce[,logcounts(sce)[rowData(sce)$Symbol == "OLFM4",] > 0]
+
+ggplot(data.frame(tsne1 = tsne_red[,1],
+                  tsne2 = tsne_red[,2],
+                  tissue = colData(sce_red)$Tissue,
+                  patient = colData(sce_red)$Patient)) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = tissue))
 ```
