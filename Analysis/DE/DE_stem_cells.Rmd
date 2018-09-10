@@ -1,0 +1,31 @@
+---
+title: "Differentia expression in stem cell compartment"
+author: "Nils Eling"
+date: "10/09/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script performs differential expression between the stem cells of different tissues.
+
+## Read in the data 
+
+```{r data}
+library(scater)
+library(scran)
+library(edgeR)
+sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+
+# Select all OLFM4 cells
+sce_olfm4 <- sce[,logcounts(sce)[rowData(sce)$Symbol == "OLFM4",] > 0]
+plot(table(colData(sce_olfm4)$Tissue))
+```
+
+# GC vs BE
+
+```{r}
+
+```
