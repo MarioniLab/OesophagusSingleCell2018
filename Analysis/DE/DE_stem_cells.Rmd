@@ -17,17 +17,41 @@ This script performs differential expression between the stem cells of different
 library(scater)
 library(scran)
 library(edgeR)
+library(ggplot2)
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+```
 
+# OLFM4 cells
+
+## Select cells
+
+```{r}
 # Select all OLFM4 cells
 sce_olfm4 <- sce[,logcounts(sce)[rowData(sce)$Symbol == "OLFM4",] > 0]
 plot(table(colData(sce_olfm4)$Tissue))
+table(colData(sce_olfm4)$Tissue, colData(sce_olfm4)$Patient)
 ```
 
-# GC vs BE
+## Visualize cells
 
 ```{r}
-sce.test <- sce_olfm4[,grepl("BE|GC", colData(sce_olfm4)$Tissue)]
+# Tissue
+ggplot(data.frame(tSNE1 = reducedDims(sce_olfm4)$TSNE[,1],
+                  tSNE2 = reducedDims(sce_olfm4)$TSNE[,2],
+                  tissue = colData(sce_olfm4)$Tissue)) +
+  geom_point(aes(tSNE1, tSNE2, colour = tissue))
+
+# Patient
+ggplot(data.frame(tSNE1 = reducedDims(sce_olfm4)$TSNE[,1],
+                  tSNE2 = reducedDims(sce_olfm4)$TSNE[,2],
+                  patient = colData(sce_olfm4)$Patient)) +
+  geom_point(aes(tSNE1, tSNE2, colour = patient))
+```
+
+# D2 vs BE
+
+```{r}
+sce.test <- sce_olfm4[,grepl("BE|D2", colData(sce_olfm4)$Tissue)]
 sce.test <- sce.test[Matrix::rowMeans(logcounts(sce.test)) > 0.1,]
 sce.test <- normalize(sce.test)
   
@@ -40,8 +64,10 @@ colnames(mat) <- unique(paste(colData(sce.test)$Patient,
                                 colData(sce.test)$Tissue, sep = "_"))
   
 for(j in colnames(mat)){
-  cur_batch <- unlist(strsplit(j, "_"))[2]
-  mat[,j] <- Matrix::rowSums(counts(sce.test)[,colData(sce.test)$Library == cur_batch]) 
+  cur_patient <- unlist(strsplit(j, "_"))[1]
+  cur_tissue <- unlist(strsplit(j, "_"))[2]
+  mat[,j] <- Matrix::rowSums(counts(sce.test)[,colData(sce.test)$Patient == cur_patient &
+                                                colData(sce.test)$Tissue == cur_tissue]) 
 }
   
 # Perform differential testing
@@ -49,13 +75,21 @@ y <- DGEList(counts=mat,
              group=sapply(colnames(mat), 
                           function(n){unlist(strsplit(n, "_"))[1]}))
 y <- calcNormFactors(y)
-design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[1]}))
-colnames(design) <- c("Tc0", "Tc1")
+design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
+colnames(design) <- c("BE", "D2")
 y <- estimateDisp(y,design)
   
 fit <- glmQLFit(y,design, robust = TRUE)
 qlf <- glmTreat(fit,coef=2, lfc = 0.5, 
-                contrast = makeContrasts(Tc1 - Tc0, levels = design))
+                contrast = makeContrasts(D2 - BE, levels = design))
 cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
-  
+
+# Save markers
+cur_out <- list()
+cur_out$BE <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.01,]
+cur_out$BE$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$BE), rowData(sce)$ID)]
+cur_out$D2 <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.01,]
+cur_out$D2$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$D2), rowData(sce)$ID)]
 ```
+
+# Based on clustering
