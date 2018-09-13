@@ -19,6 +19,7 @@ library(scran)
 library(edgeR)
 library(ggplot2)
 library(openxlsx)
+library(RColorBrewer)
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
@@ -96,3 +97,148 @@ write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_singl
 ```
 
 # Based on clustering
+
+## Visualize clustering
+
+```{r}
+ggplot(data.frame(tSNE1 = reducedDims(sce)$TSNE[,1],
+                  tSNE2 = reducedDims(sce)$TSNE[,2],
+                  cluster = factor(colData(sce)$Global_cluster))) +
+  geom_point(aes(tSNE1, tSNE2, colour = cluster)) + 
+  scale_colour_manual(values = c(brewer.pal(9, "Set1"), 
+                                 brewer.pal(8, "Set2"),
+                                 brewer.pal(12, "Set3")))
+
+ggplot(data.frame(tSNE1 = reducedDims(sce)$TSNE[,1],
+                  tSNE2 = reducedDims(sce)$TSNE[,2],
+                  cluster = factor(colData(sce)$Tissue))) +
+  geom_point(aes(tSNE1, tSNE2, colour = cluster)) + 
+  scale_colour_manual(values = c(brewer.pal(9, "Set1"), 
+                                 brewer.pal(8, "Set2"),
+                                 brewer.pal(12, "Set3")))
+
+ggplot(data.frame(tSNE1 = reducedDims(sce)$TSNE[,1],
+                  tSNE2 = reducedDims(sce)$TSNE[,2],
+                  OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) +
+  geom_point(aes(tSNE1, tSNE2, colour = OLFM4)) + 
+  scale_colour_viridis_c()
+
+# Select possible stem cell clusters
+sce.sub <- sce[,colData(sce)$Global_cluster == 2 |
+                                       colData(sce)$Global_cluster == 16 |
+                                       colData(sce)$Global_cluster == 12]
+
+ggplot(data.frame(tSNE1 = reducedDims(sce.sub)$TSNE[,1],
+                  tSNE2 = reducedDims(sce.sub)$TSNE[,2],
+                  cluster = factor(colData(sce.sub)$Global_cluster))) +
+  geom_point(aes(tSNE1, tSNE2, colour = cluster)) + 
+  scale_colour_manual(values = c(brewer.pal(9, "Set1")))
+
+ggplot(data.frame(tSNE1 = reducedDims(sce.sub)$TSNE[,1],
+                  tSNE2 = reducedDims(sce.sub)$TSNE[,2],
+                  cluster = factor(colData(sce.sub)$Tissue))) +
+  geom_point(aes(tSNE1, tSNE2, colour = cluster)) + 
+  scale_colour_manual(values = c(brewer.pal(9, "Set1")))
+
+ggplot(data.frame(tSNE1 = reducedDims(sce.sub)$TSNE[,1],
+                  tSNE2 = reducedDims(sce.sub)$TSNE[,2],
+                  OLFM4 = logcounts(sce.sub)[rowData(sce.sub)$Symbol == "OLFM4",])) +
+  geom_point(aes(tSNE1, tSNE2, colour = OLFM4)) + 
+  scale_colour_viridis_c()
+
+table(colData(sce.sub)$Tissue, colData(sce.sub)$Patient)
+```
+
+# Differential expression analysis
+
+## GC vs BE
+
+```{r}
+sce.test <- sce.sub[,grepl("GC|BE", colData(sce.sub)$Tissue)]
+sce.test <- sce.test[Matrix::rowMeans(logcounts(sce.test)) > 0.1,]
+sce.test <- normalize(sce.test)
+  
+# Sum counts with each batch and group
+mat <- matrix(data = NA, ncol = length(unique(paste(colData(sce.test)$Patient, 
+                                        colData(sce.test)$Tissue, sep = "_"))), 
+              nrow = nrow(counts(sce.test)))
+rownames(mat) <- rownames(counts(sce.test))
+colnames(mat) <- unique(paste(colData(sce.test)$Patient, 
+                                colData(sce.test)$Tissue, sep = "_"))
+  
+for(j in colnames(mat)){
+  cur_patient <- unlist(strsplit(j, "_"))[1]
+  cur_tissue <- unlist(strsplit(j, "_"))[2]
+  mat[,j] <- Matrix::rowSums(counts(sce.test)[,colData(sce.test)$Patient == cur_patient &
+                                                colData(sce.test)$Tissue == cur_tissue]) 
+}
+  
+# Perform differential testing
+y <- DGEList(counts=mat,
+             group=sapply(colnames(mat), 
+                          function(n){unlist(strsplit(n, "_"))[1]}))
+y <- calcNormFactors(y)
+design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
+colnames(design) <- c("BE", "GC")
+y <- estimateDisp(y,design)
+  
+fit <- glmQLFit(y,design, robust = TRUE)
+qlf <- glmTreat(fit,coef=2, lfc = 0.5, 
+                contrast = makeContrasts(GC - BE, levels = design))
+cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
+
+# Save markers
+cur_out <- list()
+cur_out$BE <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.01,]
+cur_out$BE$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$BE), rowData(sce)$ID)]
+cur_out$GC <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.01,]
+cur_out$GC$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$GC), rowData(sce)$ID)]
+
+write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Cluster_based/BE_vs_GC.xlsx")
+```
+
+## GC vs D2
+
+```{r}
+sce.test <- sce.sub[,grepl("D2|BE", colData(sce.sub)$Tissue)]
+sce.test <- sce.test[Matrix::rowMeans(logcounts(sce.test)) > 0.1,]
+sce.test <- normalize(sce.test)
+  
+# Sum counts with each batch and group
+mat <- matrix(data = NA, ncol = length(unique(paste(colData(sce.test)$Patient, 
+                                        colData(sce.test)$Tissue, sep = "_"))), 
+              nrow = nrow(counts(sce.test)))
+rownames(mat) <- rownames(counts(sce.test))
+colnames(mat) <- unique(paste(colData(sce.test)$Patient, 
+                                colData(sce.test)$Tissue, sep = "_"))
+  
+for(j in colnames(mat)){
+  cur_patient <- unlist(strsplit(j, "_"))[1]
+  cur_tissue <- unlist(strsplit(j, "_"))[2]
+  mat[,j] <- Matrix::rowSums(counts(sce.test)[,colData(sce.test)$Patient == cur_patient &
+                                                colData(sce.test)$Tissue == cur_tissue]) 
+}
+  
+# Perform differential testing
+y <- DGEList(counts=mat,
+             group=sapply(colnames(mat), 
+                          function(n){unlist(strsplit(n, "_"))[1]}))
+y <- calcNormFactors(y)
+design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
+colnames(design) <- c("BE", "D2")
+y <- estimateDisp(y,design)
+  
+fit <- glmQLFit(y,design, robust = TRUE)
+qlf <- glmTreat(fit,coef=2, lfc = 0.5, 
+                contrast = makeContrasts(D2 - BE, levels = design))
+cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
+
+# Save markers
+cur_out <- list()
+cur_out$BE <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.01,]
+cur_out$BE$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$BE), rowData(sce)$ID)]
+cur_out$D2 <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.01,]
+cur_out$D2$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$D2), rowData(sce)$ID)]
+
+write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Cluster_based/BE_vs_D2.xlsx")
+```
