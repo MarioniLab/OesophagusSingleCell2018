@@ -18,6 +18,7 @@ library(scater)
 library(scran)
 library(edgeR)
 library(ggplot2)
+library(openxlsx)
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
@@ -90,6 +91,8 @@ cur_out$BE <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.01,]
 cur_out$BE$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$BE), rowData(sce)$ID)]
 cur_out$D2 <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.01,]
 cur_out$D2$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$D2), rowData(sce)$ID)]
+
+write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/OLFM4_cells/BE_vs_D2.xlsx")
 ```
 
 # Based on clustering
