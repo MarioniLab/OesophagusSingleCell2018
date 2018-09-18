@@ -20,6 +20,7 @@ library(edgeR)
 library(ggplot2)
 library(openxlsx)
 library(RColorBrewer)
+source("../../Analysis/Functions/auxiliary.R")
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
@@ -103,7 +104,7 @@ write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_singl
 ```{r}
 ggplot(data.frame(tSNE1 = reducedDims(sce)$TSNE[,1],
                   tSNE2 = reducedDims(sce)$TSNE[,2],
-                  cluster = factor(colData(sce)$Global_cluster))) +
+                  cluster = factor(colData(sce)$Tissue_cluster))) +
   geom_point(aes(tSNE1, tSNE2, colour = cluster)) + 
   scale_colour_manual(values = c(brewer.pal(9, "Set1"), 
                                  brewer.pal(8, "Set2"),
@@ -124,13 +125,17 @@ ggplot(data.frame(tSNE1 = reducedDims(sce)$TSNE[,1],
   scale_colour_viridis_c()
 
 # Select possible stem cell clusters
-sce.sub <- sce[,colData(sce)$Global_cluster == 2 |
-                                       colData(sce)$Global_cluster == 16 |
-                                       colData(sce)$Global_cluster == 12]
+sce.sub <- sce[,((colData(sce)$Tissue_cluster == 3 | 
+                    colData(sce)$Tissue_cluster == 4) & 
+                   colData(sce)$Tissue == "BE") |
+                 ((colData(sce)$Tissue_cluster == 3) & 
+                   colData(sce)$Tissue == "GC") |
+                 (colData(sce)$Tissue_cluster == 4 & 
+                   colData(sce)$Tissue == "D2")]
 
 ggplot(data.frame(tSNE1 = reducedDims(sce.sub)$TSNE[,1],
                   tSNE2 = reducedDims(sce.sub)$TSNE[,2],
-                  cluster = factor(colData(sce.sub)$Global_cluster))) +
+                  cluster = factor(colData(sce.sub)$Tissue_cluster))) +
   geom_point(aes(tSNE1, tSNE2, colour = cluster)) + 
   scale_colour_manual(values = c(brewer.pal(9, "Set1")))
 
@@ -197,7 +202,7 @@ cur_out$GC$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$GC), rowData(s
 write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Cluster_based/BE_vs_GC.xlsx")
 ```
 
-## GC vs D2
+## BE vs D2
 
 ```{r}
 sce.test <- sce.sub[,grepl("D2|BE", colData(sce.sub)$Tissue)]
@@ -241,4 +246,16 @@ cur_out$D2 <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.01,]
 cur_out$D2$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$D2), rowData(sce)$ID)]
 
 write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Cluster_based/BE_vs_D2.xlsx")
+```
+
+# Differential expression testing Patient 12
+
+```{r patient12}
+cur_sce <- sce.sub[,sce.sub$Patient == "Patient12"]
+cur_sce <- normalise(cur_sce)
+
+markers <- marker.detection(cur_sce, clusters = cur_sce$Tissue)
+
+write.xlsx(markers, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Patient12/All_markers.xlsx")
+
 ```
