@@ -23,6 +23,7 @@ library(ggplot2)
 library(viridis)
 library(monocle)
 library(plot3Drgl)
+library(umap)
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 
 # Select only GC and BE
@@ -142,30 +143,41 @@ ggplot(data.frame(tsne1 = cds@reducedDimS[1,],
   geom_point(aes(x = tsne1, y = tsne2, colour = OLFM4)) + scale_colour_viridis()
 ```
 
-
-
-
-
-
-
-
-
-
+# UMAP
 
 ```{r}
-# Number of OLFM4 expressing cells in GC and BE
-length(which(logcounts(sce)[rowData(sce)$Symbol == "OLFM4",
-                            colData(sce)$Tissue == "GC"] > 0))
-length(which(logcounts(sce)[rowData(sce)$Symbol == "OLFM4",
-                            colData(sce)$Tissue == "BE"] > 0))
+umap.all <- umap(t(corrected))
 
-# Only visualize the OLFM4 positive cells
-tsne_red <- tsne$Y[logcounts(sce)[rowData(sce)$Symbol == "OLFM4",] > 0,]
-sce_red <- sce[,logcounts(sce)[rowData(sce)$Symbol == "OLFM4",] > 0]
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  tissue = colData(sce)$Tissue,
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = tissue))
 
-ggplot(data.frame(tsne1 = tsne_red[,1],
-                  tsne2 = tsne_red[,2],
-                  tissue = colData(sce_red)$Tissue,
-                  patient = colData(sce_red)$Patient)) + 
-  geom_point(aes(x = tsne1, y = tsne2, colour = tissue))
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) +
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = OLFM4)) + scale_colour_viridis()
+
+# Only on BE
+cur_corrected <- corrected[,colData(sce)$Tissue == "BE"]
+cur_sce <- sce[,colData(sce)$Tissue == "BE"]
+cur_sce <- normalize(cur_sce)
+umap.all <- umap(t(cur_corrected))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  OLFM4 = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "OLFM4",])) +
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = OLFM4)) + scale_colour_viridis()
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  cluster = as.factor(colData(cur_sce)$Tissue_cluster))) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = cluster))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  cluster = as.factor(colData(cur_sce)$Patient))) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = cluster))
+
 ```
