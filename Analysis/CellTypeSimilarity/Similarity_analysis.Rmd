@@ -19,6 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 suppressMessages(library(clustree))
 suppressMessages(library(scater))
+suppressMessages(library(scran))
 library(RColorBrewer)
 library(pheatmap)
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
@@ -52,4 +53,28 @@ pheatmap(mat[1:2,], cluster_rows = FALSE,
                                              "GC" = brewer.pal(12, "Set3")[5],
                                              "SMG" = brewer.pal(12, "Set3")[6],
                                              "D2" = brewer.pal(12, "Set3")[7])))
+```
+
+## Use clustree
+
+```{r}
+# Iterate over number of shared nearest neighbours when constructing the graph
+gs <- rev(seq(5, 100, 5))
+mat <- matrix(NA, ncol = ncol(metadata(sce)$corrected), nrow = length(gs))
+for(i in 1:nrow(mat)){
+  cur_g <- buildSNNGraph(metadata(sce)$corrected, k = gs[i], pc.approx = TRUE)
+  mat[i,] <- igraph::cluster_louvain(cur_g)$membership
+}
+
+for_clustrees <- data.frame(Patient = colData(sce)$Patient,
+                            Tissue = colData(sce)$Tissue,
+                            clustering = t(mat[seq(1,20,5),]))
+
+clustree(for_clustrees, prefix = "clustering")
+```
+
+## Visualize clusters
+
+```{r}
+ggplot()
 ```
