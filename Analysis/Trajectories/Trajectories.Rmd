@@ -29,7 +29,7 @@ sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cel
 
 # Select only GC and BE
 sce <- sce[,colData(sce)$Tissue == "BE" | colData(sce)$Tissue == "GC"]
-sce <- sce[rowMeans(counts(sce)) > 0.1,]
+sce <- sce[Matrix::rowMeans(counts(sce)) > 0.1,]
 
 # Split sce object
 sce_single <- split.sce(sce, groups = unique(colData(sce)$Sample), colData.name = "Sample")
@@ -42,6 +42,37 @@ colnames(corrected) <- paste(colData(sce)$Barcode, colData(sce)$Patient, colData
 ```
 
 # Try different visualization techniques
+
+# Diffusionmap
+
+```{r}
+library(destiny)
+
+dm <- DiffusionMap(t(corrected), k = 20)
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  tissue = colData(sce)$Tissue,
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = DC1, y = DC2, colour = tissue))
+
+# Remove outlying cells
+sce <- sce[,dm$DC1 < 0.02]
+corrected <- corrected[,dm$DC1 < 0.02]
+
+dm <- DiffusionMap(t(corrected), k = 5)
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  tissue = colData(sce)$Tissue,
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = DC1, y = DC2, colour = tissue))
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) +
+  geom_point(aes(x = DC1, y = DC2, colour = OLFM4)) + scale_colour_viridis()
+```
 
 ## PCA
 
@@ -117,6 +148,26 @@ ggplot(data.frame(tsne1 = cds@reducedDimS[1,],
   geom_point(aes(x = tsne1, y = tsne2, colour = OLFM4)) + scale_colour_viridis()
 ```
 
+# PHATE
+
+```{r}
+library(phateR)
+
+tree.phate <- phate(t(corrected), gamma = 0)
+
+ggplot(data.frame(phate1 = tree.phate$embedding[,1],
+                  phate2 = tree.phate$embedding[,2],
+                  tissue = colData(sce)$Tissue,
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = phate1, y = phate2, colour = tissue))
+
+ggplot(data.frame(phate1 = tree.phate$embedding[,1],
+                  phate2 = tree.phate$embedding[,2],
+                  OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) +
+  geom_point(aes(x = phate1, y = phate2, colour = OLFM4)) + scale_colour_viridis()
+
+```
+
 # UMAP
 
 ```{r}
@@ -156,5 +207,4 @@ ggplot(data.frame(UMAP1 = umap.all$layout[,1],
 
 ```
 
-# Diffusionmap
 
