@@ -6,6 +6,8 @@ output:
   html_document:
     toc: true
     toc_depth: 2
+    knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '/Users/nils/Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/Trajectory_analysis.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -67,6 +69,18 @@ ggplot(data.frame(DC1 = dm$DC1,
                   tissue = colData(sce)$Tissue,
                   patient = colData(sce)$Patient)) + 
   geom_point(aes(x = DC1, y = DC2, colour = tissue))
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  tissue = colData(sce)$Tissue,
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = DC1, y = DC2, colour = patient))
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  clusters = colData(sce)$A,
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = DC1, y = DC2, colour = patient))
 
 ggplot(data.frame(DC1 = dm$DC1,
                   DC2 = dm$DC2,
@@ -165,6 +179,19 @@ ggplot(data.frame(phate1 = tree.phate$embedding[,1],
                   phate2 = tree.phate$embedding[,2],
                   OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) +
   geom_point(aes(x = phate1, y = phate2, colour = OLFM4)) + scale_colour_viridis()
+
+cur_corrected <- corrected[,colData(sce)$Tissue == "BE"]
+cur_sce <- sce[,colData(sce)$Tissue == "BE"]
+cur_sce <- normalize(cur_sce)
+umap.all <- umap(t(cur_corrected))
+
+tree.BE <- phate(t(cur_corrected), gamma = 0)
+
+ggplot(data.frame(phate1 = tree.BE$embedding[,1],
+                  phate2 = tree.BE$embedding[,2],
+                  tissue = colData(cur_sce)$Tissue,
+                  patient = colData(cur_sce)$Patient)) + 
+  geom_point(aes(x = phate1, y = phate2, colour = tissue))
 
 ```
 
