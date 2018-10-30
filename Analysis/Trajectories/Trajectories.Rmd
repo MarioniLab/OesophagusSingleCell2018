@@ -183,16 +183,24 @@ ggplot(data.frame(phate1 = tree.phate$embedding[,1],
 cur_corrected <- corrected[,colData(sce)$Tissue == "BE"]
 cur_sce <- sce[,colData(sce)$Tissue == "BE"]
 cur_sce <- normalize(cur_sce)
-umap.all <- umap(t(cur_corrected))
 
 tree.BE <- phate(t(cur_corrected), gamma = 0)
 
 ggplot(data.frame(phate1 = tree.BE$embedding[,1],
                   phate2 = tree.BE$embedding[,2],
-                  tissue = colData(cur_sce)$Tissue,
+                  clusters = factor(colData(cur_sce)$Tissue_cluster),
                   patient = colData(cur_sce)$Patient)) + 
-  geom_point(aes(x = phate1, y = phate2, colour = tissue))
+  geom_point(aes(x = phate1, y = phate2, colour = clusters))
 
+ggplot(data.frame(phate1 = tree.BE$embedding[,1],
+                  phate2 = tree.BE$embedding[,2],
+                  OLFM4 = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "OLFM4",])) +
+  geom_point(aes(x = phate1, y = phate2, colour = OLFM4)) + scale_colour_viridis()
+
+ggplot(data.frame(phate1 = tree.BE$embedding[,1],
+                  phate2 = tree.BE$embedding[,2],
+                  OLFM4 = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "MUC2",])) +
+  geom_point(aes(x = phate1, y = phate2, colour = OLFM4)) + scale_colour_viridis()
 ```
 
 # UMAP
