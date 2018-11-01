@@ -30,8 +30,14 @@ source("../../Analysis/Functions/auxiliary.R")
 # Owen read counts
 owen.data <- read.table(url("https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-018-06796-9/MediaObjects/41467_2018_6796_MOESM8_ESM.txt"))
 
+# Rename columns
+colnames(owen.data) <- as.character(sapply(colnames(owen.data), function(n){paste(unlist(strsplit(n, "_"))[3:5], collapse = "_")}))
+
 # Owen metadata
 owen.meta <- read.table(url("https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-018-06796-9/MediaObjects/41467_2018_6796_MOESM9_ESM.txt"), header = TRUE)
+
+# Reorder cells based on metadata
+owen.data <- owen.data[,as.character(owen.meta$sample_id)]
 
 # Our data
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/High_quality_sce.rds")
@@ -57,8 +63,10 @@ sce.owen <- calculateQCMetrics(sce.owen)
 
 ggplot(as.data.frame(colData(sce.owen))) +
   geom_point(aes(total_features_by_counts, log10_total_counts, colour = tissue))
+ggplot(as.data.frame(colData(sce.owen))) +
+  geom_point(aes(total_features_by_counts, log10_total_counts, colour = all_k8))
 
-# Remove cells with few genes expressed
+# Remove cells with few genes expressed (blanks as these will distort the normalization)
 sce.owen <- sce.owen[,colData(sce.owen)$total_features_by_counts > 1000]
 
 # Normalize the data
@@ -66,4 +74,28 @@ cluster <- quickCluster(sce.owen, method = "igraph", irlba.args = c("work" = 100
                          max.size = 2000, min.size = 50)
 sce.owen <- computeSumFactors(sce.owen, clusters=cluster)
 sce.owen <- normalize(sce.owen, return_log = TRUE)
+```
+
+# Visualize owen data
+
+```{r visualization}
+# Compute tSNE
+set.seed(1234)
+sce.owen <- runTSNE(sce.owen)
+
+# Visualize tissue type
+ggplot(data.frame(tSNE1 = reducedDims(sce.owen)$TSNE[,1],
+                  tSNE2 = reducedDims(sce.owen)$TSNE[,2],
+                  colData(sce.owen))) + geom_point(aes(tSNE1, tSNE2, colour = tissue))
+
+# Visualize clustering on all cells
+ggplot(data.frame(tSNE1 = reducedDims(sce.owen)$TSNE[,1],
+                  tSNE2 = reducedDims(sce.owen)$TSNE[,2],
+                  colData(sce.owen))) + geom_point(aes(tSNE1, tSNE2, colour = as.factor(all_k8)))
+
+# Visualize clustering of gland cells
+ggplot(data.frame(tSNE1 = reducedDims(sce.owen)$TSNE[,1],
+                  tSNE2 = reducedDims(sce.owen)$TSNE[,2],
+                  colData(sce.owen))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = as.factor(gland_cells_k3)))
 ```
