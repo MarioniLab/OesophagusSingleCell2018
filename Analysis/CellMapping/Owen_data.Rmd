@@ -1,0 +1,35 @@
+---
+title: "Cell mapping using the Data from Owen et al."
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/OwenMapping.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Read in data
+
+The data can be obtained from the original puplication:
+Owen, R. P. et al., Single cell RNA-seq reveals profound transcriptional similarity between Barrett’s oesophagus and oesophageal submucosal glands, Nature Communications, 9, 2018
+
+```{r}
+library(scran)
+library(SingleCellExperiment)
+source("../../Analysis/")
+
+# Owen read counts
+owen.data <- read.table(url("https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-018-06796-9/MediaObjects/41467_2018_6796_MOESM8_ESM.txt"))
+
+# Owen metadata
+owen.meta <- read.table(url("https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-018-06796-9/MediaObjects/41467_2018_6796_MOESM9_ESM.txt"), header = TRUE)
+
+# Our data
+sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/High_quality_sce.rds")
+```
