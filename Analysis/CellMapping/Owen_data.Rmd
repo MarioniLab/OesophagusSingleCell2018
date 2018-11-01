@@ -22,7 +22,10 @@ Owen, R. P. et al., Single cell RNA-seq reveals profound transcriptional similar
 ```{r}
 library(scran)
 library(SingleCellExperiment)
-source("../../Analysis/")
+library(Matrix)
+library(scater)
+library(ggplot2)
+source("../../Analysis/Functions/auxiliary.R")
 
 # Owen read counts
 owen.data <- read.table(url("https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-018-06796-9/MediaObjects/41467_2018_6796_MOESM8_ESM.txt"))
@@ -32,4 +35,35 @@ owen.meta <- read.table(url("https://static-content.springer.com/esm/art%3A10.10
 
 # Our data
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/High_quality_sce.rds")
+```
+
+# Process Owen data
+
+```{r processing}
+# Remove genes that contain NA
+owen.data <- owen.data[!is.na(rowSums(owen.data)),]
+
+# Remove ERCC counts 
+owen.data <- owen.data[!grepl("ERCC", rownames(owen.data)),]
+
+# Build the SCE object
+sce.owen <- SingleCellExperiment(assays = list(counts = as(as.matrix(owen.data), "dgCMatrix")),
+                                 colData = as.data.frame(owen.meta))
+# Remove low quality cells
+sce.owen <- sce.owen[,apply(colData(sce.owen), 1, function(n){sum(is.na(n))/7}) != 1]
+
+# Visualize quality
+sce.owen <- calculateQCMetrics(sce.owen)
+
+ggplot(as.data.frame(colData(sce.owen))) +
+  geom_point(aes(total_features_by_counts, log10_total_counts, colour = tissue))
+
+# Remove cells with few genes expressed
+sce.owen <- sce.owen[,colData(sce.owen)$total_features_by_counts > 1000]
+
+# Normalize the data
+cluster <- quickCluster(sce.owen, method = "igraph", irlba.args = c("work" = 100), 
+                         max.size = 2000, min.size = 50)
+sce.owen <- computeSumFactors(sce.owen, clusters=cluster)
+sce.owen <- normalize(sce.owen, return_log = TRUE)
 ```
