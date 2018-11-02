@@ -178,7 +178,23 @@ ggplot(data.frame(UMAP1 = umap.all$layout[,1],
 # StemID
 
 ```{r stem_id}
-source()
+source("../../../RaceID3_StemID2/RaceID3_StemID2_class.R")
+
+sc <- SCseq(as.data.frame(as.matrix(2^(logcounts(sce)[rownames(corrected)]) - 1)))
+sc <- clustexp(sc, FSelect = FALSE)
+plotsaturation(sc,disp=TRUE)
+sc <- findoutliers(sc)
+ltr <- Ltree(sc)
+ltr <- compentropy(ltr)
+ltr <- projcells(ltr, cthr = 2, nmode = FALSE)
+ltr <- projback(ltr)
+ltr <- lineagetree(ltr,pthr=0.01, nmode=FALSE, fast=FALSE)
+ltr <- comppvalue(ltr,pethr=0.01, nmode=FALSE, fast=FALSE)
+plotmap(ltr)
+plotmapprojections(ltr)
+plottree(ltr,showCells=TRUE,nmode=FALSE,scthr=.3)
+x <- compscore(ltr,nn=1,scthr=.3)
+
 ```
 
 
