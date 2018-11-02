@@ -25,6 +25,8 @@ library(SingleCellExperiment)
 library(Matrix)
 library(scater)
 library(ggplot2)
+library(Rtsne)
+library(RColorBrewer)
 source("../../Analysis/Functions/auxiliary.R")
 
 # Owen read counts
@@ -98,4 +100,54 @@ ggplot(data.frame(tSNE1 = reducedDims(sce.owen)$TSNE[,1],
                   tSNE2 = reducedDims(sce.owen)$TSNE[,2],
                   colData(sce.owen))) + 
   geom_point(aes(tSNE1, tSNE2, colour = as.factor(gland_cells_k3)))
+```
+
+# Map owen data onto our data
+
+```{r}
+# Match rownames
+genes <- intersect(rownames(sce.owen), rownames(sce$Patient10_SIGAA5_NE))
+sce.owen <- sce.owen[genes,]
+sce <- lapply(sce, function(n){n[genes,]})
+
+# Collect tissue information
+tissues <- unlist(lapply(sce, function(n){n$Tissue}))
+tissues.all <- c(tissues, as.character(sce.owen$tissue))
+
+# Add Owen data to sce
+sce$Owen <- sce.owen
+corrected <- batch.correction(sce)
+
+# Visualize results
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE)
+
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  tissue = as.factor(tissues.all))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = tissue)) + 
+  scale_colour_manual(values = c(brewer.pal(9, "Set1"), brewer.pal(8, "Set2")))
+
+# Visualize gland cluster
+tissue.gland <- c(tissues, colData(sce.owen)$gland_cells_k3)
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  tissue = as.factor(tissue.gland))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = tissue)) + 
+  scale_colour_manual(values = c(brewer.pal(9, "Set1"), brewer.pal(8, "Set2")))
+
+# Visualize only specific clusters
+tissues <- c("SMG", "BE", "Barrett's")
+ggplot(data.frame(tSNE1 = tsne$Y[tissues.all %in% tissues,1],
+                  tSNE2 = tsne$Y[tissues.all %in% tissues,2],
+                  tissue = as.factor(tissues.all[tissues.all %in% tissues]))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = tissue)) + 
+  scale_colour_manual(values = c(brewer.pal(9, "Set1"), brewer.pal(8, "Set2")))
+
+ggplot(data.frame(tSNE1 = tsne$Y[tissues.all %in% tissues,1],
+                  tSNE2 = tsne$Y[tissues.all %in% tissues,2],
+                  tissue = as.factor(tissue.gland[tissues.all %in% tissues]))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = tissue)) + 
+  scale_colour_manual(values = c(brewer.pal(9, "Set1"), brewer.pal(8, "Set2")))
+
 ```
