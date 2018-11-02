@@ -40,8 +40,8 @@ order.names <- c("Patient2_SIGAD9_GOJ", "Patient8_SIGAE7_GOJ", "Patient10_SIGAB5
                  "Patient3_SIGAB5_SCJ", "Patient7_SIGAB4_SCJ", "Patient9_SIGAE9_SCJ",
                  "Patient10_SIGAA5_NE", "Patient2_SIGAC9_NE", "Patient7_SIGAA4_NE",
                  "Patient8_SIGAD7_NE", "Patient2_SIGAE9_GC", "Patient3_SIGAD5_GC",
-                 "Patient7_SIGAD4_GC", "Patient12_SIGAD3_GC", "Patient3_SIGAC5_BE",
-                 "Patient7_SIGAC4_BE", "Patient9_SIGAF9_BE", "Patient12_SIGAC3_BE",
+                 "Patient7_SIGAD4_GC", "Patient3_SIGAC5_BE",
+                 "Patient7_SIGAC4_BE", "Patient9_SIGAF9_BE",
                  "Patient7_SIGAE4_D2", "Patient8_SIGAG7_D2", "Patient9_SIGAH9_D2",
                  "Patient12_SIGAE3_D2", "Patient10_SIGAD5_SMG", "Patient11_SIGAA4_SMG",
                  "Patient13_SIGAC8_SMG", "Patient13_SIGAD8_GOJ", "Patient13_SIGAE8_GC")
@@ -89,12 +89,13 @@ ggplot(data.frame(tSNE1 = tsne$Y[,1],
 colData(sce)$Global_cluster <- clusters
   
 # Perform differential expression
-des <- model.matrix(~colData(sce)$Patient+colData(sce)$Tissue)
-markers <- findMarkers(sce, clusters = colData(sce)$Global_cluster, design = des)
+markers <- findMarkers(sce, clusters = colData(sce)$Global_cluster, 
+                       block = paste(colData(sce)$Patient, colData(sce)$Tissue, sep = "_"))
   
 markers.spec <- lapply(markers, function(n){
   if(!is.na(n$Top[1])){
-  cur_n <- n[n$FDR < 0.1 & apply(n[,3:ncol(n)], 1, function(x){sum(x > 0)}) == ncol(n) - 2,]
+    cur_n <- n[,!as.logical(is.nan(as.matrix(n[1,])))]
+    cur_n <- cur_n[cur_n$FDR < 0.1 & apply(cur_n[,4:ncol(cur_n)], 1, function(x){sum(x > 0)}) == ncol(cur_n) - 3,]
     if(nrow(cur_n) > 0){
       cur_n$GeneName <- rowData(sce)$Symbol[match(rownames(cur_n), rowData(sce)$ID)]
     }

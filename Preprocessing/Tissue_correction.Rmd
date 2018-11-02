@@ -75,11 +75,10 @@ for(i in c("NE", "GC", "BE", "GOJ", "SCJ", "D2", "SMG")){
   table(cluster, colData(tissue_sce)$Patient)
   
   # Perform differential expression
-  des <- model.matrix(~colData(tissue_sce)$Patient)
-  markers <- findMarkers(tissue_sce, clusters = cluster, design = des)
+  markers <- findMarkers(tissue_sce, clusters = cluster, block = colData(tissue_sce)$Patient)
   
   markers.spec <- lapply(markers, function(n){
-    if(!is.na(n$Top[1])){
+    if(!is.na(n$Top[1]) & !is.nan(sum(as.matrix(n[1,3:ncol(n)])))){
     cur_n <- n[n$FDR < 0.1 & apply(n[,3:ncol(n)], 1, function(x){sum(x > 0)}) == ncol(n) - 2,]
       if(nrow(cur_n) > 0){
         cur_n$GeneName <- rowData(tissue_sce)$Symbol[match(rownames(cur_n), rowData(tissue_sce)$ID)]
