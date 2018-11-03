@@ -26,6 +26,7 @@ library(viridis)
 library(monocle)
 library(plot3Drgl)
 library(umap)
+library(vegan)
 source("../Functions/auxiliary.R")
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 
@@ -180,16 +181,22 @@ ggplot(data.frame(UMAP1 = umap.all$layout[,1],
 ```{r stem_id}
 source("../../../RaceID3_StemID2/RaceID3_StemID2_class.R")
 
-sc <- SCseq(as.data.frame(as.matrix(2^(logcounts(sce)[rownames(corrected)]) - 1)))
-sc <- clustexp(sc, FSelect = FALSE)
-plotsaturation(sc,disp=TRUE)
+# Find highly variable genes
+HVgenes <- HVG(sce)
+
+sc <- SCseq(as.data.frame(as.matrix(2^(logcounts(sce)[HVgenes,]) - 1)))
+#sc <- clustexp(sc, FSelect = FALSE)
+sc@cluster$kpart <- as.numeric(sce$Tissue_cluster)
+sc@tsne <- as.data.frame(tsne$Y)
 sc <- findoutliers(sc)
+plottsne(sc,final=TRUE)
 ltr <- Ltree(sc)
 ltr <- compentropy(ltr)
-ltr <- projcells(ltr, cthr = 2, nmode = FALSE)
-ltr <- projback(ltr)
-ltr <- lineagetree(ltr,pthr=0.01, nmode=FALSE, fast=FALSE)
-ltr <- comppvalue(ltr,pethr=0.01, nmode=FALSE, fast=FALSE)
+ltr <- projcells(ltr, cthr = 0, nmode = FALSE)
+ltr@ldata$pdil <- tsne$Y
+ltr <- projback(ltr, fast = TRUE)
+ltr <- lineagetree(ltr,pthr=0.01, nmode=FALSE, fast=TRUE)
+ltr <- comppvalue(ltr,pethr=0.01, nmode=FALSE, fast=TRUE)
 plotmap(ltr)
 plotmapprojections(ltr)
 plottree(ltr,showCells=TRUE,nmode=FALSE,scthr=.3)
