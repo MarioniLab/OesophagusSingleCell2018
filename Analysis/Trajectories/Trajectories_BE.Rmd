@@ -178,7 +178,7 @@ ggplot(data.frame(UMAP1 = umap.all$layout[,1],
 
 # StemID
 
-```{r stem_id}
+```{r stem_id, eval=FALSE}
 source("../../../RaceID3_StemID2/RaceID3_StemID2_class.R")
 
 # Find highly variable genes
