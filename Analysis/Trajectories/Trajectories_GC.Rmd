@@ -1,0 +1,199 @@
+---
+title: "Trajectory analysis"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/Trajectory_BE.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(reticulate)
+use_python("/usr/bin/python")
+mpl = reticulate::import("matplotlib")
+mpl$use('TkAgg')
+```
+
+This script performs trajectory analysis on the BE and GC samples
+
+## Read in batch corrected data
+
+```{r}
+suppressMessages(library(scran))
+suppressMessages(library(Rtsne))
+suppressMessages(library(ggplot2))
+suppressMessages(library(viridis))
+suppressMessages(library(monocle))
+suppressMessages(library(plot3Drgl))
+suppressMessages(library(umap))
+suppressMessages(library(vegan))
+suppressMessages(source("../Functions/auxiliary.R"))
+sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+
+# Select only GC
+sce <- sce[,colData(sce)$Tissue == "GC"]
+sce <- sce[Matrix::rowMeans(counts(sce)) > 0.1,]
+
+# Split sce object
+sce_single <- split.sce(sce, groups = unique(colData(sce)$Sample), colData.name = "Sample")
+
+corrected <- batch.correction(sce_single)
+
+sce <- do.call("cbind", sce_single)
+
+colnames(corrected) <- paste(colData(sce)$Barcode, colData(sce)$Patient, colData(sce)$Tissue, sep = "_")
+```
+
+# Try different visualization techniques
+
+## PCA
+
+```{r}
+# Batch corrected data already come as pca
+ggplot(data.frame(PC1 = corrected[1,],
+                  PC2 = corrected[2,],
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = PC1, y = PC2, colour = patient))
+
+ggplot(data.frame(PC1 = corrected[1,],
+                  PC2 = corrected[2,],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = PC1, y = PC2, colour = cluster))
+
+ggplot(data.frame(PC1 = corrected[1,],
+                  PC2 = corrected[2,],
+                  PHGR1 = logcounts(sce)[rowData(sce)$Symbol == "PHGR1",])) +
+  geom_point(aes(x = PC1, y = PC2, colour = PHGR1)) +
+  scale_colour_viridis()
+```
+
+## tSNE
+
+```{r}
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE)
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = cluster))
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = patient))
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  PHGR1 = logcounts(sce)[rowData(sce)$Symbol == "PHGR1",])) +
+  geom_point(aes(x = tsne1, y = tsne2, colour = PHGR1)) + scale_colour_viridis()
+
+```
+
+# Diffusionmap
+
+```{r}
+library(destiny)
+
+dm <- DiffusionMap(t(corrected), k = 20)
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = DC1, y = DC2, color = patient))
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = DC1, y = DC2, color = cluster))
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  PHGR1 = logcounts(sce)[rowData(sce)$Symbol == "PHGR1",])) +
+  geom_point(aes(x = DC1, y = DC2, colour = PHGR1)) + scale_colour_viridis()
+```
+
+# PHATE
+
+```{r}
+library(phateR)
+
+tree.phate <- phate(t(corrected), gamma = 0)
+
+ggplot(data.frame(phate1 = tree.phate$embedding[,1],
+                  phate2 = tree.phate$embedding[,2],
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = phate1, y = phate2, colour = patient))
+
+ggplot(data.frame(phate1 = tree.phate$embedding[,1],
+                  phate2 = tree.phate$embedding[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = phate1, y = phate2, colour = cluster))
+
+ggplot(data.frame(phate1 = tree.phate$embedding[,1],
+                  phate2 = tree.phate$embedding[,2],
+                  PHGR1 = logcounts(sce)[rowData(sce)$Symbol == "PHGR1",])) +
+  geom_point(aes(x = phate1, y = phate2, colour = PHGR1)) + scale_colour_viridis()
+```
+
+# UMAP
+
+```{r}
+umap.all <- umap(t(corrected))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = patient))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = cluster))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  PHGR1 = logcounts(sce)[rowData(sce)$Symbol == "PHGR1",])) +
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = PHGR1)) + scale_colour_viridis()
+```
+
+# Monocle
+
+```{r monocle, eval = FALSE}
+cds <- monocle::newCellDataSet(cellData = corrected)
+```
+
+# StemID
+
+```{r stem_id, eval=FALSE}
+source("../../../RaceID3_StemID2/RaceID3_StemID2_class.R")
+
+# Find highly variable genes
+HVgenes <- HVG(sce)
+
+sc <- SCseq(as.data.frame(as.matrix(2^(logcounts(sce)[HVgenes,]) - 1)))
+#sc <- clustexp(sc, FSelect = FALSE)
+sc@cluster$kpart <- as.numeric(sce$Tissue_cluster)
+sc@tsne <- as.data.frame(tsne$Y)
+sc <- findoutliers(sc)
+plottsne(sc,final=TRUE)
+ltr <- Ltree(sc)
+ltr <- compentropy(ltr)
+ltr <- projcells(ltr, cthr = 0, nmode = FALSE)
+ltr@ldata$pdil <- tsne$Y
+ltr <- projback(ltr, fast = TRUE)
+ltr <- lineagetree(ltr,pthr=0.01, nmode=FALSE, fast=TRUE)
+ltr <- comppvalue(ltr,pethr=0.01, nmode=FALSE, fast=TRUE)
+plotmap(ltr)
+plotmapprojections(ltr)
+plottree(ltr,showCells=TRUE,nmode=FALSE,scthr=.3)
+x <- compscore(ltr,nn=1,scthr=.3)
+
+```
+
+
