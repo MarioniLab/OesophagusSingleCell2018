@@ -65,11 +65,24 @@ for(i in c("NE", "GC", "BE", "GOJ", "SCJ", "D2", "SMG")){
   #dendro <- hclust(dist.all, method = "ward.D2")
   #cluster <- as.character(cutreeDynamic(dendro = dendro, distM = as.matrix(dist.all), 
   #                      minClusterSize = 10, deepSplit = 0))
-  g <- buildSNNGraph(corrected, k = 10)
+  g <- buildSNNGraph(corrected, k = 5)
   cluster <- igraph::cluster_louvain(g)$membership
   
   # Save clustering in new slot
   colData(tissue_sce)$Tissue_cluster <- cluster
+  
+  # Visualize clustering
+  cur_p <- ggplot(data.frame(tSNE1 = reducedDims(tissue_sce)$TSNE[,1],
+                    tSNE2 = reducedDims(tissue_sce)$TSNE[,2],
+                    clusters = as.factor(colData(tissue_sce)$Tissue_cluster))) +
+    geom_point(aes(tSNE1, tSNE2, colour = clusters))
+  print(cur_p)
+
+  cur_p <- ggplot(data.frame(tSNE1 = reducedDims(tissue_sce)$TSNE[,1],
+                    tSNE2 = reducedDims(tissue_sce)$TSNE[,2],
+                    clusters = as.factor(colData(tissue_sce)$Patient))) +
+    geom_point(aes(tSNE1, tSNE2, colour = clusters))
+  print(cur_p)
   
   # Visualize whether populations are patient specific 
   table(cluster, colData(tissue_sce)$Patient)
@@ -94,17 +107,6 @@ for(i in c("NE", "GC", "BE", "GOJ", "SCJ", "D2", "SMG")){
   
   tissue.list[[i]] <- tissue_sce
 }
-
-# Visualize clustering
-ggplot(data.frame(tSNE1 = reducedDims(tissue.list$GOJ)$TSNE[,1],
-                  tSNE2 = reducedDims(tissue.list$GOJ)$TSNE[,2],
-                  clusters = as.factor(colData(tissue.list$GOJ)$Tissue_cluster))) +
-  geom_point(aes(tSNE1, tSNE2, colour = clusters))
-
-ggplot(data.frame(tSNE1 = reducedDims(tissue.list$GOJ)$TSNE[,1],
-                  tSNE2 = reducedDims(tissue.list$GOJ)$TSNE[,2],
-                  clusters = as.factor(colData(tissue.list$GOJ)$Patient))) +
-  geom_point(aes(tSNE1, tSNE2, colour = clusters))
 
 saveRDS(tissue.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Tissue_sce.rds")
 ```
