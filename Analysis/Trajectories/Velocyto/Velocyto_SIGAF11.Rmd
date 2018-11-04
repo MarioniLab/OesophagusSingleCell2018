@@ -1,0 +1,104 @@
+---
+title: "Velocyto"
+author: "Nils Eling"
+date: "2 February 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Read in the data and library
+
+```{r}
+library(velocyto.R)
+library(RColorBrewer)
+library(Rtsne)
+library(scater)
+loom.data <- read.loom.matrices("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Old/Detailed_analysis/Stem_cells/velocyto/SIGAF11.loom")
+
+# Load filtered counts
+sce <- readRDS("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+sce <- sce[,grepl("SIGAF11", sce$Sample)]
+sce <- normalize(sce)
+
+spliced.dat <- loom.data$spliced
+colnames(spliced.dat) <- paste("SIGAF11_NE", seq(1,ncol(spliced.dat), 1), sep="_")
+spliced.dat <- spliced.dat[,colnames(norm)]
+
+unspliced.dat <- loom.data$unspliced
+colnames(unspliced.dat) <- paste("SIGAF11_NE", seq(1,ncol(unspliced.dat), 1), sep="_")
+unspliced.dat <- unspliced.dat[,colnames(norm)]
+
+# Load cluster information
+clusters <- read.csv("../../Patient5/Results/Clusters_SIGAF11_NE.csv", stringsAsFactors = FALSE)
+rownames(clusters) <- clusters$X
+
+# Load tsne 
+tsne <- readRDS("../../Patient5/Results/tsne_SIGAF11_NE.rds")
+```
+
+# Velocyto estimation
+
+```{r}
+# Filter genes
+clusters.named <- clusters$groups
+names(clusters.named) <- clusters$X
+spliced.dat <- filter.genes.by.cluster.expression(emat = spliced.dat,
+                                                  clusters = clusters.named,
+                                                  min.max.cluster.average = 0.1)
+
+unspliced.dat <- filter.genes.by.cluster.expression(emat = unspliced.dat,
+                                                  clusters = clusters.named,
+                                                  min.max.cluster.average = 0.03)
+length(intersect(rownames(spliced.dat),rownames(unspliced.dat)))
+```
+
+Estimate the velocyties
+
+```{r}
+fit.quantile <- 0.05
+rvel.cd <- gene.relative.velocity.estimates(spliced.dat,
+                                            unspliced.dat,
+                                            deltaT=1,
+                                            kCells=3,
+                                            kGenes=1,
+                                            fit.quantile=fit.quantile)
+
+cols <- as.vector(brewer.pal(n = 8,"Set3"))
+cell.colors <- cols[as.numeric(clusters.named)]
+names(cell.colors) <- names(clusters.named)
+
+velocyto.R::pca.velocity.plot(rvel.cd, cell.colors = ac(cell.colors,alpha=0.7), scale='log', 
+                               cex=0.8, arrow.scale=5, show.grid.flow=TRUE,
+                               min.grid.cell.mass=0.5, grid.n=40, 
+                               arrow.lwd=1, do.par=F, cell.border.alpha = 0.1)
+
+pca.velocity.plot(rvel.cd,nPcs=2,scale='log', 
+                  cell.colors=ac(cell.colors,alpha=0.7),
+                  cex=1.2, pcount = 1)
+
+tSNE.velocity.plot(rvel.cd,nPcs=15,cell.colors=cell.colors,cex=0.9,perplexity=200,norm.nPcs=NA,pcount=0.1,scale='log',do.par=F)
+
+emb <- tsne$Y
+rownames(emb) <- colnames(norm)
+show.velocity.on.embedding.cor(emb, rvel.cd, scale='sqrt', 
+                               cex=0.8, arrow.scale=5, show.grid.flow=TRUE, 
+                               cell.colors=ac(cell.colors,alpha=0.7),
+                               min.grid.cell.mass=0.5, grid.n=40, 
+                               arrow.lwd=1, do.par=F, cell.border.alpha = 0.1)
+
+show.velocity.on.embedding.cor(emb,rvel.cd,n=200,scale='log',cell.colors=ac(cell.colors,alpha=0.5),cex=0.8,arrow.scale=3,show.grid.flow=TRUE,min.grid.cell.mass=0.5,grid.n=40,arrow.lwd=1,do.par=F,cell.border.alpha = 0.1)
+
+#pca <- prcomp(t(log10(norm + 1)))
+#emb <- pca$x
+#rownames(emb) <- colnames(norm)
+#show.velocity.on.embedding.cor(emb, rvel.cd, 
+#                               cex=0.8, arrow.scale=5, show.grid.flow=TRUE, 
+#                               cell.colors=ac(cell.colors,alpha=0.7),
+#                               min.grid.cell.mass=0.5, grid.n=40, 
+#                               arrow.lwd=1, do.par=F, cell.border.alpha = 0.1)
+
+# Add diffusionmap
+```
