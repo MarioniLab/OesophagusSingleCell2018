@@ -195,12 +195,28 @@ source("../../../RaceID3_StemID2/RaceID3_StemID2_class.R")
 # Find highly variable genes
 HVgenes <- HVG(sce)
 
-sc <- SCseq(as.data.frame(as.matrix(2^(logcounts(sce)[HVgenes,]) - 1)))
-#sc <- clustexp(sc, FSelect = FALSE)
-sc@cluster$kpart <- as.numeric(sce$Tissue_cluster)
-sc@tsne <- as.data.frame(tsne$Y)
+sc <- SCseq(as.data.frame(as.matrix(counts(sce)[HVgenes,])))
+sc@ndata <- as.data.frame(as.matrix(2^(logcounts(sce)[HVgenes,]) - 1))
+sc <- clustexp(sc, FSelect = FALSE)
 sc <- findoutliers(sc)
-plottsne(sc,final=TRUE)
+sc <- rfcorrect(sc,rfseed=12345,final=TRUE,nbfactor=5)
+sc <- comptsne(sc,rseed=15555,sammonmap=FALSE,initial_cmd=TRUE)
+
+ggplot(data.frame(tsne1 = sc@tsne$V1,
+                  tsne2 = sc@tsne$V2,
+                  cluster = as.factor(sc@cluster$kpart))) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = cluster))
+
+ggplot(data.frame(tsne1 = sc@tsne$V1,
+                  tsne2 = sc@tsne$V2,
+                  cluster = as.factor(sce$Tissue_cluster))) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = cluster))
+
+ggplot(data.frame(tsne1 = sc@tsne$V1,
+                  tsne2 = sc@tsne$V2,
+                  cluster = as.factor(sce$Patient))) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = cluster))
+
 ltr <- Ltree(sc)
 ltr <- compentropy(ltr)
 ltr <- projcells(ltr, cthr = 0, nmode = FALSE)
