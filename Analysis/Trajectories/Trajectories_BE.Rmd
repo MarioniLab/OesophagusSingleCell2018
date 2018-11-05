@@ -181,6 +181,15 @@ ggplot(data.frame(UMAP1 = umap.all$layout[,1],
   geom_point(aes(x = UMAP1, y = UMAP2, colour = OLFM4)) + scale_colour_viridis()
 ```
 
+# Entropy
+
+The stemID score is calculated based on the cell-specific entropy times the number of links between clusters.
+We can therefore calculate the cell-specific entropy as a proxy for stemness.
+
+```{r entropy}
+
+```
+
 # Monocle
 
 ```{r monocle, eval = FALSE}
@@ -192,11 +201,16 @@ cds <- monocle::newCellDataSet(cellData = corrected)
 ```{r stem_id, eval=FALSE}
 source("../../../RaceID3_StemID2/RaceID3_StemID2_class.R")
 
+# Run StemID on cells from Patient3
+sce <- sce[,sce$Patient == "Patient3"]
+sce <- sce[Matrix::rowMeans(counts(sce)) > 0.1,]
+
 # Find highly variable genes
 HVgenes <- HVG(sce)
 
 sc <- SCseq(as.data.frame(as.matrix(counts(sce)[HVgenes,])))
-sc@ndata <- as.data.frame(as.matrix(2^(logcounts(sce)[HVgenes,]) - 1))
+# For normalized data, pseudocount of 0.1 is added for entropy calculation
+sc@ndata <- as.data.frame(as.matrix(2^(logcounts(sce)[HVgenes,]) - 1 + 0.1))
 sc <- clustexp(sc, FSelect = FALSE)
 sc <- findoutliers(sc)
 sc <- rfcorrect(sc,rfseed=12345,final=TRUE,nbfactor=5)
@@ -214,21 +228,23 @@ ggplot(data.frame(tsne1 = sc@tsne$V1,
 
 ggplot(data.frame(tsne1 = sc@tsne$V1,
                   tsne2 = sc@tsne$V2,
-                  cluster = as.factor(sce$Patient))) + 
-  geom_point(aes(x = tsne1, y = tsne2, colour = cluster))
+                  OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) +
+  geom_point(aes(x = tsne1, y = tsne2, colour = OLFM4)) + scale_colour_viridis()
 
 ltr <- Ltree(sc)
 ltr <- compentropy(ltr)
 ltr <- projcells(ltr, cthr = 0, nmode = FALSE)
-ltr@ldata$pdil <- tsne$Y
 ltr <- projback(ltr, fast = TRUE)
 ltr <- lineagetree(ltr,pthr=0.01, nmode=FALSE, fast=TRUE)
 ltr <- comppvalue(ltr,pethr=0.01, nmode=FALSE, fast=TRUE)
 plotmap(ltr)
-plotmapprojections(ltr)
-plottree(ltr,showCells=TRUE,nmode=FALSE,scthr=.3)
+plotlinkpv(ltr)
 x <- compscore(ltr,nn=1,scthr=.3)
 
+# Plot the StemID score for each cluster
+ggplot(data.frame(score = x$StemIDscore,
+                  clust.names = names(x$StemIDscore))) +
+  geom_col(aes(clust.names, score))
 ```
 
 
