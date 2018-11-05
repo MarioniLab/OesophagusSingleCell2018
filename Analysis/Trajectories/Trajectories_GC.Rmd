@@ -162,6 +162,80 @@ ggplot(data.frame(UMAP1 = umap.all$layout[,1],
   geom_point(aes(x = UMAP1, y = UMAP2, colour = PHGR1)) + scale_colour_viridis()
 ```
 
+# Entropy
+
+The stemID score is calculated based on the cell-specific entropy times the number of links between clusters.
+We can therefore calculate the cell-specific entropy as a proxy for stemness.
+The entropy has to be computed on the normalized counts.
+
+```{r entropy}
+# These functions are taken from the RaceID3_StemID2_class.R script
+# 1. approach - Add pseudotcount of 0.1
+cur_counts <- 2^(logcounts(sce)) - 1 + 0.1
+probs   <- t(t(cur_counts)/apply(cur_counts,2,sum))
+entropy <- -apply(probs*log(probs)/log(nrow(sce)),2,sum)
+
+# Cluster with highest median entropy
+clust.entropy <- vector(length = length(unique(colData(sce)$Tissue_cluster)))
+names(clust.entropy) <- as.character(unique(colData(sce)$Tissue_cluster))
+for(i in unique(colData(sce)$Tissue_cluster)){
+  clust.entropy[as.character(i)] <- mean(entropy[as.numeric(colData(sce)$Tissue_cluster) == i])
+}
+
+ggplot(data.frame(score = as.numeric(clust.entropy),
+                  clust.names = names(clust.entropy))) +
+  geom_point(aes(clust.names, score)) + ylim(c(0.3, 0.9))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = cluster))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100))
+
+ggplot(data.frame(phate1 = tree.phate$embedding[,1],
+                  phate2 = tree.phate$embedding[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(x = phate1, y = phate2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100))
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  entropy = entropy)) + 
+  geom_point(aes(x = DC1, y = DC2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100))
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100))
+
+# Find marker genes for stem cells
+cors <- t(apply(logcounts(sce), 1, function(n){
+  cur_cor <- suppressWarnings(cor.test(n, entropy, method = "spearman"))
+  c(cur_cor$estimate, cur_cor$p.value)
+}))
+cors <- as.data.frame(cors)
+cors$BH <- p.adjust(cors$V2, method = "BH")
+cors$Symbol <- rowData(sce)$Symbol[match(rownames(cors), rowData(sce)$ID)]
+
+# Order correlations
+cors.pos <- cors[cors$rho > 0 & cors$BH < 0.01,]
+head(cors.pos[order(cors.pos$rho, decreasing = TRUE),], n = 100)
+
+# TPT1 is a pluripotency marker, Kolodziejczyk 2015, Lin 2011
+# Lin 2011, Plos One also finds: TPT1, PTMA, NCL, NASP, and HSP90AB1
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  TPT1 = logcounts(sce)[rowData(sce)$Symbol == "TPT1",])) +
+  geom_point(aes(x = tsne1, y = tsne2, colour = TPT1)) + scale_colour_viridis()
+```
+
 # Monocle
 
 ```{r monocle, eval = FALSE}
