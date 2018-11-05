@@ -256,13 +256,13 @@ head(cors.pos[order(cors.pos$rho, decreasing = TRUE),], n = 100)
 # Lin 2011, Plos One also finds: TPT1, PTMA, NCL, NASP, and HSP90AB1
 ggplot(data.frame(UMAP1 = umap.all$layout[,1],
                   UMAP2 = umap.all$layout[,2],
-                  OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "PTMA",])) +
-  geom_point(aes(x = UMAP1, y = UMAP2, colour = OLFM4)) + scale_colour_viridis()
+                  PTMA = logcounts(sce)[rowData(sce)$Symbol == "PTMA",])) +
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = PTMA)) + scale_colour_viridis()
 
 ggplot(data.frame(UMAP1 = umap.all$layout[,1],
                   UMAP2 = umap.all$layout[,2],
-                  OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "NCL",])) +
-  geom_point(aes(x = UMAP1, y = UMAP2, colour = OLFM4)) + scale_colour_viridis()
+                  NCL = logcounts(sce)[rowData(sce)$Symbol == "NCL",])) +
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = NCL)) + scale_colour_viridis()
 ```
 
 # Monocle
