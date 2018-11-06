@@ -1,5 +1,5 @@
 ---
-title: "Velocyto SIGAF11 NE Patient 5"
+title: "Velocyto SIGAC5 BE Patient 3"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 2
     knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Velocyto/Patient5_SIGAF11_NE.html') })
+        encoding = encoding, output_file = '../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Velocyto/Patient3_SIGAC5_BE.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -21,18 +21,21 @@ library(velocyto.R)
 library(RColorBrewer)
 library(Rtsne)
 library(scater)
-loom.data <- read.loom.matrices("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Old/Detailed_analysis/Stem_cells/velocyto/SIGAF11.loom")
+loom.data <- read.loom.matrices("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Old/Detailed_analysis/Stem_cells/velocyto/SIGAC5.loom")
 
 # Load filtered counts
 sce <- readRDS("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
-sce <- sce$Patient5_SIGAF11_NE
+sce <- sce$Patient3_SIGAC5_BE
 sce <- normalize(sce)
 
 spliced.dat <- loom.data$spliced
-spliced.dat <- spliced.dat[,paste("SIGAF11:", sub("-1", "x", sce$Barcode), sep = "")]
+spliced.dat <- spliced.dat[,intersect(paste("SIGAC5:", sub("-1", "x", sce$Barcode), sep = ""),
+                                      colnames(spliced.dat))]
 
 unspliced.dat <- loom.data$unspliced
 unspliced.dat <- unspliced.dat[,colnames(spliced.dat)]
+
+sce <- sce[,match(sub("x", "-1", sub("SIGAC5:", "", colnames(spliced.dat))), sce$Barcode)]
 ```
 
 # Velocyto estimation
