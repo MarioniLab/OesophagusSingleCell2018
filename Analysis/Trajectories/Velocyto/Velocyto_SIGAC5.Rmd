@@ -92,4 +92,12 @@ ggplot(data.frame(tSNE1 = emb[,1],
                   cluster = as.factor(sce$Clusters))) + 
   geom_point(aes(tSNE1, tSNE2, colour = cluster)) +
   scale_color_manual(values = cols)
+
+ggplot(data.frame(tSNE1 = emb[,1],
+                  tSNE2 = emb[,2], 
+                  OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) + 
+  geom_point(aes(tSNE1, tSNE2, colour = OLFM4)) +
+  scale_color_viridis_c()
+
+
 ```
