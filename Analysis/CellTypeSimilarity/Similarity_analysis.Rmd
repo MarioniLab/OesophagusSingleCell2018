@@ -20,14 +20,14 @@ knitr::opts_chunk$set(echo = TRUE)
 suppressMessages(library(clustree))
 suppressMessages(library(scater))
 suppressMessages(library(scran))
-library(RColorBrewer)
-library(pheatmap)
+suppressMessages(library(RColorBrewer))
+suppressMessages(library(pheatmap))
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
 # Calculate normal dendrogram on averaged counts
 
-```{r, fig.width=12}
+```{r, fig.width=15}
 clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
 mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(metadata(sce)$corrected))
 colnames(mat) <- unique(clusters)
@@ -57,7 +57,7 @@ pheatmap(mat[1:2,], cluster_rows = FALSE,
 
 ## Use clustree
 
-```{r}
+```{r, eval=FALSE}
 # Iterate over number of shared nearest neighbours when constructing the graph
 gs <- rev(seq(5, 100, 5))
 mat <- matrix(NA, ncol = ncol(metadata(sce)$corrected), nrow = length(gs))
@@ -71,10 +71,4 @@ for_clustrees <- data.frame(Patient = colData(sce)$Patient,
                             clustering = t(mat[seq(1,20,5),]))
 
 clustree(for_clustrees, prefix = "clustering")
-```
-
-## Visualize clusters
-
-```{r}
-ggplot()
 ```
