@@ -1,0 +1,317 @@
+---
+title: "Trajectory analysis"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/Trajectory_SMG.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(reticulate)
+use_python("/usr/bin/python")
+mpl = reticulate::import("matplotlib")
+mpl$use('TkAgg')
+```
+
+This script performs trajectory analysis on the BE and GC samples
+
+## Read in batch corrected data
+
+```{r}
+suppressMessages(library(scran))
+suppressMessages(library(Rtsne))
+suppressMessages(library(ggplot2))
+suppressMessages(library(viridis))
+suppressMessages(library(monocle))
+suppressMessages(library(plot3Drgl))
+suppressMessages(library(umap))
+suppressMessages(library(vegan))
+suppressMessages(source("../Functions/auxiliary.R"))
+sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+
+# Select only SMG
+sce <- sce[,colData(sce)$Tissue == "SMG"]
+sce <- sce[Matrix::rowMeans(counts(sce)) > 0.1,]
+
+# Split sce object
+sce_single <- split.sce(sce, groups = unique(colData(sce)$Sample), colData.name = "Sample")
+
+corrected <- batch.correction(sce_single)
+
+sce <- do.call("cbind", sce_single)
+
+colnames(corrected) <- paste(colData(sce)$Barcode, colData(sce)$Patient, colData(sce)$Tissue, sep = "_")
+```
+
+# Try different visualization techniques
+
+## PCA
+
+```{r}
+# Batch corrected data already come as pca
+ggplot(data.frame(PC1 = corrected[1,],
+                  PC2 = corrected[2,],
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = PC1, y = PC2, colour = patient))
+
+ggplot(data.frame(PC1 = corrected[1,],
+                  PC2 = corrected[2,],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = PC1, y = PC2, colour = cluster))
+
+ggplot(data.frame(PC1 = corrected[1,],
+                  PC2 = corrected[2,],
+                  KRT7 = logcounts(sce)[rowData(sce)$Symbol == "KRT7",])) +
+  geom_point(aes(x = PC1, y = PC2, colour = KRT7)) +
+  scale_colour_viridis()
+```
+
+## tSNE
+
+```{r}
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE)
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = cluster))
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = patient))
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  KRT7 = logcounts(sce)[rowData(sce)$Symbol == "KRT7",])) +
+  geom_point(aes(x = tsne1, y = tsne2, colour = KRT7)) + scale_colour_viridis()
+
+```
+
+# Diffusionmap
+
+```{r}
+library(destiny)
+
+dm <- DiffusionMap(t(corrected), k = 20)
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = DC1, y = DC2, color = patient))
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = DC1, y = DC2, color = cluster))
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  KRT7 = logcounts(sce)[rowData(sce)$Symbol == "KRT7",])) +
+  geom_point(aes(x = DC1, y = DC2, colour = KRT7)) + scale_colour_viridis()
+```
+
+# PHATE
+
+```{r}
+library(phateR)
+
+tree.phate <- phate(t(corrected), gamma = 0)
+
+ggplot(data.frame(phate1 = tree.phate$embedding[,1],
+                  phate2 = tree.phate$embedding[,2],
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = phate1, y = phate2, colour = patient))
+
+ggplot(data.frame(phate1 = tree.phate$embedding[,1],
+                  phate2 = tree.phate$embedding[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = phate1, y = phate2, colour = cluster))
+
+ggplot(data.frame(phate1 = tree.phate$embedding[,1],
+                  phate2 = tree.phate$embedding[,2],
+                  KRT7 = logcounts(sce)[rowData(sce)$Symbol == "KRT7",])) +
+  geom_point(aes(x = phate1, y = phate2, colour = KRT7)) + scale_colour_viridis()
+```
+
+# UMAP
+
+```{r}
+umap.all <- umap(t(corrected))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  patient = colData(sce)$Patient)) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = patient))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = cluster))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  KRT7 = logcounts(sce)[rowData(sce)$Symbol == "KRT7",])) +
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = KRT7)) + scale_colour_viridis()
+```
+
+# Entropy
+
+The stemID score is calculated based on the cell-specific entropy times the number of links between clusters.
+We can therefore calculate the cell-specific entropy as a proxy for stemness.
+The entropy has to be computed on the normalized counts.
+
+```{r entropy}
+# These functions are taken from the RaceID3_StemID2_class.R script
+# 1. approach - Add pseudotcount of 0.1
+cur_counts <- 2^(logcounts(sce)) - 1 + 0.1
+probs   <- t(t(cur_counts)/apply(cur_counts,2,sum))
+entropy <- -apply(probs*log(probs)/log(nrow(sce)),2,sum)
+
+# Cluster with highest median entropy
+clust.entropy <- vector(length = length(unique(colData(sce)$Tissue_cluster)))
+names(clust.entropy) <- as.character(unique(colData(sce)$Tissue_cluster))
+for(i in unique(colData(sce)$Tissue_cluster)){
+  clust.entropy[as.character(i)] <- mean(entropy[as.numeric(colData(sce)$Tissue_cluster) == i])
+}
+
+ggplot(data.frame(score = as.numeric(clust.entropy),
+                  clust.names = names(clust.entropy))) +
+  geom_point(aes(clust.names, score)) + ylim(c(0.3, 0.9))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = cluster))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100))
+
+ggplot(data.frame(phate1 = tree.phate$embedding[,1],
+                  phate2 = tree.phate$embedding[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(x = phate1, y = phate2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100))
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  entropy = entropy)) + 
+  geom_point(aes(x = DC1, y = DC2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100))
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100))
+
+# Find marker genes for stem cells
+cors <- t(apply(logcounts(sce), 1, function(n){
+  cur_cor <- suppressWarnings(cor.test(n, entropy, method = "spearman"))
+  c(cur_cor$estimate, cur_cor$p.value)
+}))
+cors <- as.data.frame(cors)
+cors$BH <- p.adjust(cors$V2, method = "BH")
+cors$Symbol <- rowData(sce)$Symbol[match(rownames(cors), rowData(sce)$ID)]
+
+# Order correlations
+cors.pos <- cors[cors$rho > 0 & cors$BH < 0.01,]
+head(cors.pos[order(cors.pos$rho, decreasing = TRUE),], n = 100)
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  VWF = logcounts(sce)[rowData(sce)$Symbol == "VWF",])) +
+  geom_point(aes(x = tsne1, y = tsne2, colour = VWF)) + scale_colour_viridis()
+```
+
+# Focus on serous clusters
+
+```{r outliers}
+corrected <- corrected[,sce$Tissue_cluster %in% c(7, 8, 10, 14, 18, 19)]
+sce <- sce[,sce$Tissue_cluster %in% c(7, 8, 10, 14, 18, 19)]
+
+# PCA
+ggplot(data.frame(PC1 = corrected[1,],
+                  PC2 = corrected[2,],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = PC1, y = PC2, colour = cluster))
+
+# tSNE
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE)
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = cluster))
+
+# Diffusionmap
+dm <- DiffusionMap(t(corrected), k = 20)
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = DC1, y = DC2, color = cluster))
+
+# Phate
+tree.phate <- phate(t(corrected), gamma = 0)
+
+ggplot(data.frame(phate1 = tree.phate$embedding[,1],
+                  phate2 = tree.phate$embedding[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = phate1, y = phate2, colour = cluster))
+
+# UMAP
+umap.all <- umap(t(corrected))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = cluster))
+```
+
+# Monocle
+
+```{r monocle, eval = FALSE}
+cds <- monocle::newCellDataSet(cellData = corrected)
+```
+
+# StemID
+
+```{r stem_id, eval=FALSE}
+source("../../../RaceID3_StemID2/RaceID3_StemID2_class.R")
+
+# Find highly variable genes
+HVgenes <- HVG(sce)
+
+sc <- SCseq(as.data.frame(as.matrix(2^(logcounts(sce)[HVgenes,]) - 1)))
+#sc <- clustexp(sc, FSelect = FALSE)
+sc@cluster$kpart <- as.numeric(sce$Tissue_cluster)
+sc@tsne <- as.data.frame(tsne$Y)
+sc <- findoutliers(sc)
+plottsne(sc,final=TRUE)
+ltr <- Ltree(sc)
+ltr <- compentropy(ltr)
+ltr <- projcells(ltr, cthr = 0, nmode = FALSE)
+ltr@ldata$pdil <- tsne$Y
+ltr <- projback(ltr, fast = TRUE)
+ltr <- lineagetree(ltr,pthr=0.01, nmode=FALSE, fast=TRUE)
+ltr <- comppvalue(ltr,pethr=0.01, nmode=FALSE, fast=TRUE)
+plotmap(ltr)
+plotmapprojections(ltr)
+plottree(ltr,showCells=TRUE,nmode=FALSE,scthr=.3)
+x <- compscore(ltr,nn=1,scthr=.3)
+
+```
+
+
