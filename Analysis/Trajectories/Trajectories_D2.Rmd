@@ -238,6 +238,52 @@ ggplot(data.frame(UMAP1 = umap.all$layout[,1],
   geom_point(aes(x = UMAP1, y = UMAP2, colour = GSTA1)) + scale_colour_viridis()
 ```
 
+# Remove outlying cluster
+
+```{r outliers}
+corrected <- corrected[,!(sce$Tissue_cluster %in% c(1,11, 12, 13,6))]
+sce <- sce[,!(sce$Tissue_cluster %in% c(1,11,12, 13,6))]
+
+# PCA
+ggplot(data.frame(PC1 = corrected[1,],
+                  PC2 = corrected[2,],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = PC1, y = PC2, colour = cluster))
+
+# tSNE
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE)
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = tsne1, y = tsne2, colour = cluster))
+
+# Diffusionmap
+dm <- DiffusionMap(t(corrected), k = 20)
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = DC1, y = DC2, color = cluster))
+
+# Phate
+tree.phate <- phate(t(corrected), gamma = 0)
+
+ggplot(data.frame(phate1 = tree.phate$embedding[,1],
+                  phate2 = tree.phate$embedding[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = phate1, y = phate2, colour = cluster))
+
+# UMAP
+umap.all <- umap(t(corrected))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = cluster))
+```
+
 # Monocle
 
 ```{r monocle, eval = FALSE}
