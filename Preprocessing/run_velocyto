@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+for D in $(find ../../../Karol/data/ -mindepth 1 -maxdepth 1 -type d) 
+do
+	scripts/bsub -M 32000 velocyto run10x -m ../../../Karol/genome/repeat_msk.gtf $D ../../../Karol/genome/genes.gtf
+done
