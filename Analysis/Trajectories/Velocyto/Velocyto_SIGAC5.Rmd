@@ -16,12 +16,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Read in the data and library
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 library(velocyto.R)
 library(RColorBrewer)
 library(Rtsne)
 library(scater)
-loom.data <- read.loom.matrices("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Old/Detailed_analysis/Stem_cells/velocyto/SIGAC5.loom")
+loom.data <- read.loom.matrices("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Velocyto/SIGAC5.loom")
 
 # Load filtered counts
 sce <- readRDS("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
@@ -36,6 +36,17 @@ unspliced.dat <- loom.data$unspliced
 unspliced.dat <- unspliced.dat[,colnames(spliced.dat)]
 
 sce <- sce[,match(sub("x", "-1", sub("SIGAC5:", "", colnames(spliced.dat))), sce$Barcode)]
+
+ggplot(data.frame(tSNE1 = reducedDims(sce)$TSNE[,1],
+       tSNE2 = reducedDims(sce)$TSNE[,2],
+       cluster = as.factor(sce$Clusters))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = cluster))
+
+ggplot(data.frame(tSNE1 = reducedDims(sce)$TSNE[,1],
+       tSNE2 = reducedDims(sce)$TSNE[,2],
+       OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) + 
+  geom_point(aes(tSNE1, tSNE2, colour = OLFM4)) +
+  scale_color_viridis_c()
 ```
 
 # Velocyto estimation
@@ -61,7 +72,7 @@ fit.quantile <- 0.05
 rvel.cd <- gene.relative.velocity.estimates(spliced.dat,
                                             unspliced.dat,
                                             deltaT=1,
-                                            kCells=3,
+                                            kCells=10,
                                             kGenes=1,
                                             fit.quantile=fit.quantile)
 
