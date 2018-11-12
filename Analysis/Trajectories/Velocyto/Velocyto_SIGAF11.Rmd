@@ -21,7 +21,7 @@ library(velocyto.R)
 library(RColorBrewer)
 library(Rtsne)
 library(scater)
-loom.data <- read.loom.matrices("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Old/Detailed_analysis/Stem_cells/velocyto/SIGAF11.loom")
+loom.data <- read.loom.matrices("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Velocyto/SIGAF11.loom")
 
 # Load filtered counts
 sce <- readRDS("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
@@ -58,7 +58,7 @@ fit.quantile <- 0.05
 rvel.cd <- gene.relative.velocity.estimates(spliced.dat,
                                             unspliced.dat,
                                             deltaT=1,
-                                            kCells=3,
+                                            kCells=10,
                                             kGenes=1,
                                             fit.quantile=fit.quantile)
 
