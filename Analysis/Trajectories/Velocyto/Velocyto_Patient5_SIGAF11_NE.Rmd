@@ -6,7 +6,7 @@ output:
   html_document:
     toc: true
     toc_depth: 2
-    knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
         encoding = encoding, output_file = '../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Velocyto/Patient5_SIGAF11_NE.html') })
 ---
 
@@ -16,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Read in the data and library
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 library(velocyto.R)
 library(RColorBrewer)
 library(Rtsne)
