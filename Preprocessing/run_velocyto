@@ -2,5 +2,6 @@
 
 for D in $(find ../../../Karol/data/ -mindepth 1 -maxdepth 1 -type d) 
 do
-	scripts/bsub -M 32000 velocyto run10x -m ../../../Karol/genome/repeat_msk.gtf $D ../../../Karol/genome/genes.gtf
+	scripts/bsub -M 64000 velocyto run10x $D ../../../Karol/genome/genes.gtf
+	# scripts/bsub -M 32000 velocyto run10x -m ../../../Karol/genome/mm10_rmsk_sorted.gtf $D ../../../Karol/genome/genes.gtf
 done
