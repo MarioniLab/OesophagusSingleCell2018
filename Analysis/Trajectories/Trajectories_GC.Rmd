@@ -14,7 +14,7 @@ knit: (function(inputFile, encoding) { rmarkdown::render(inputFile,
 knitr::opts_chunk$set(echo = TRUE)
 library(knitr)
 library(reticulate)
-use_python("/usr/bin/python")
+use_python("/Users/eling01/anaconda3/envs/r-reticulate/bin/python")
 mpl = reticulate::import("matplotlib")
 mpl$use('TkAgg')
 ```
@@ -32,6 +32,7 @@ suppressMessages(library(monocle))
 suppressMessages(library(plot3Drgl))
 suppressMessages(library(umap))
 suppressMessages(library(vegan))
+suppressMessages(library(phateR))
 suppressMessages(source("../Functions/auxiliary.R"))
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 
@@ -121,8 +122,7 @@ ggplot(data.frame(DC1 = dm$DC1,
 # PHATE
 
 ```{r}
-library(phateR)
-
+phate <- import("phate")
 tree.phate <- phate(t(corrected), gamma = 0)
 
 ggplot(data.frame(phate1 = tree.phate$embedding[,1],
