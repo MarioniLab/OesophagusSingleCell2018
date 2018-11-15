@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 2
 knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/DE_tissues.html') })
+        encoding = encoding, output_file = '../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/DE_tissues.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -68,7 +68,7 @@ table(cur_sce$Patient, cur_sce$Tissue)
 cur_sce <- cur_sce[,cur_sce$Patient != "Patient10"]
 
 # Differential expression analysis
-cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
+#cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
 
 # Sum counts with each batch and group
 mat <- matrix(data = NA, ncol = length(unique(paste(colData(cur_sce)$Patient, 
@@ -146,7 +146,7 @@ ggplot(data.frame(tSNE1 = reducedDims(cur_sce)$TSNE[,1],
 table(cur_sce$Patient, cur_sce$Tissue)
 
 # Differential expression analysis
-cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
+#cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
 
 # Sum counts with each batch and group
 mat <- matrix(data = NA, ncol = length(unique(paste(colData(cur_sce)$Patient, 
@@ -223,7 +223,7 @@ ggplot(data.frame(tSNE1 = reducedDims(cur_sce)$TSNE[,1],
 table(cur_sce$Patient, cur_sce$Tissue)
 
 # Differential expression analysis
-cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
+#cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
 
 # Sum counts with each batch and group
 mat <- matrix(data = NA, ncol = length(unique(paste(colData(cur_sce)$Patient, 
@@ -301,7 +301,7 @@ ggplot(data.frame(tSNE1 = reducedDims(cur_sce)$TSNE[,1],
 table(cur_sce$Patient, cur_sce$Tissue)
 
 # Differential expression analysis
-cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
+#cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
 
 # Sum counts with each batch and group
 mat <- matrix(data = NA, ncol = length(unique(paste(colData(cur_sce)$Patient, 
