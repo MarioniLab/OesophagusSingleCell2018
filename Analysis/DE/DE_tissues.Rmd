@@ -1,0 +1,110 @@
+---
+title: "Differential expression in stem cell compartment"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/DE_tissues.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script performs differential expression between GC and GOJ and SCJ and BE as well as GOJ and NE and SCJ and NE.
+
+## Read in the data 
+
+```{r data}
+library(scater)
+library(scran)
+library(edgeR)
+library(ggplot2)
+library(openxlsx)
+library(RColorBrewer)
+source("../../Analysis/Functions/auxiliary.R")
+sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+```
+
+# GOJ vs GC
+
+```{r}
+cur_sce <- sce[,grepl("GC|GOJ", sce$Tissue)]
+# Tissue
+ggplot(data.frame(tSNE1 = reducedDims(cur_sce)$TSNE[,1],
+                  tSNE2 = reducedDims(cur_sce)$TSNE[,2],
+                  tissue = colData(cur_sce)$Tissue)) +
+  geom_point(aes(tSNE1, tSNE2, colour = tissue))
+
+# clusters
+ggplot(data.frame(tSNE1 = reducedDims(cur_sce)$TSNE[grepl("GC", cur_sce$Tissue),1],
+                  tSNE2 = reducedDims(cur_sce)$TSNE[grepl("GC", cur_sce$Tissue),2],
+                  cluster = as.factor(colData(cur_sce[,grepl("GC", cur_sce$Tissue)])$Tissue_cluster))) +
+  geom_point(aes(tSNE1, tSNE2, colour = cluster)) +
+  scale_color_manual(values = c(brewer.pal(8, "Set1"), brewer.pal(8, "Set2")))
+
+ggplot(data.frame(tSNE1 = reducedDims(cur_sce)$TSNE[grepl("GOJ", cur_sce$Tissue),1],
+                  tSNE2 = reducedDims(cur_sce)$TSNE[grepl("GOJ", cur_sce$Tissue),2],
+                  cluster = as.factor(colData(cur_sce[,grepl("GOJ", cur_sce$Tissue)])$Tissue_cluster))) +
+  geom_point(aes(tSNE1, tSNE2, colour = cluster)) +
+  scale_color_manual(values = c(brewer.pal(8, "Set1"), brewer.pal(8, "Set2")))
+
+# Compare GOJ 5,6,7 vs GC 4,6,7
+cur_sce <- cur_sce[,(cur_sce$Tissue == "GOJ" & cur_sce$Tissue_cluster %in% c(5,6,7)) |
+                     (cur_sce$Tissue == "GC" & cur_sce$Tissue_cluster %in% c(4,6,7))]
+
+# Tissue
+ggplot(data.frame(tSNE1 = reducedDims(cur_sce)$TSNE[,1],
+                  tSNE2 = reducedDims(cur_sce)$TSNE[,2],
+                  tissue = colData(cur_sce)$Tissue)) +
+  geom_point(aes(tSNE1, tSNE2, colour = tissue))
+
+table(cur_sce$Patient, cur_sce$Tissue)
+
+# Remove patient 10
+cur_sce <- cur_sce[,cur_sce$Patient != "Patient10"]
+
+# Differential expression analysis
+cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
+
+# Sum counts with each batch and group
+mat <- matrix(data = NA, ncol = length(unique(paste(colData(cur_sce)$Patient, 
+                                        colData(cur_sce)$Tissue, sep = "_"))), 
+              nrow = nrow(counts(cur_sce)))
+rownames(mat) <- rownames(counts(cur_sce))
+colnames(mat) <- unique(paste(colData(cur_sce)$Patient, 
+                                colData(cur_sce)$Tissue, sep = "_"))
+  
+for(j in colnames(mat)){
+  cur_patient <- unlist(strsplit(j, "_"))[1]
+  cur_tissue <- unlist(strsplit(j, "_"))[2]
+  mat[,j] <- Matrix::rowSums(counts(cur_sce)[,colData(cur_sce)$Patient == cur_patient &
+                                                colData(cur_sce)$Tissue == cur_tissue]) 
+}
+  
+# Perform differential testing
+y <- DGEList(counts=mat,
+             group=sapply(colnames(mat), 
+                          function(n){unlist(strsplit(n, "_"))[1]}))
+y <- calcNormFactors(y)
+design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
+colnames(design) <- c("GC", "GOJ")
+y <- estimateDisp(y,design)
+  
+fit <- glmQLFit(y,design, robust = TRUE)
+qlf <- glmTreat(fit,coef=2, lfc = 0.5, 
+                contrast = makeContrasts(GC - GOJ, levels = design))
+cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
+
+# Save markers
+cur_out <- list()
+cur_out$GOJ <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.01,]
+cur_out$GOJ$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$GOJ), rowData(sce)$ID)]
+cur_out$GC <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.01,]
+cur_out$GC$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$GC), rowData(sce)$ID)]
+
+write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Tissues/GC_vs_GOJ.xlsx")
+```
