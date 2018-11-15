@@ -1,13 +1,13 @@
 ---
-title: "Velocyto SIGAC5 BE Patient 3"
+title: "Velocyto SIGAF11 NE Patient 5"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
   html_document:
     toc: true
     toc_depth: 2
-    knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Velocyto/Patient3_SIGAC5_BE.html') })
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Velocyto/Patient13_SIGAC8_SMG.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -21,32 +21,18 @@ library(velocyto.R)
 library(RColorBrewer)
 library(Rtsne)
 library(scater)
-loom.data <- read.loom.matrices("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Velocyto/SIGAC5.loom")
+loom.data <- read.loom.matrices("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Velocyto/Patient13_SIGAC8_SMG.loom")
 
 # Load filtered counts
 sce <- readRDS("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
-sce <- sce$Patient3_SIGAC5_BE
+sce <- sce$Patient13_SIGAC8_SMG
 sce <- normalize(sce)
 
 spliced.dat <- loom.data$spliced
-spliced.dat <- spliced.dat[,intersect(paste("SIGAC5:", sub("-1", "x", sce$Barcode), sep = ""),
-                                      colnames(spliced.dat))]
+spliced.dat <- spliced.dat[,paste("Patient13_SIGAC8_SMG:", sub("-1", "x", sce$Barcode), sep = "")]
 
 unspliced.dat <- loom.data$unspliced
 unspliced.dat <- unspliced.dat[,colnames(spliced.dat)]
-
-sce <- sce[,match(sub("x", "-1", sub("SIGAC5:", "", colnames(spliced.dat))), sce$Barcode)]
-
-ggplot(data.frame(tSNE1 = reducedDims(sce)$TSNE[,1],
-       tSNE2 = reducedDims(sce)$TSNE[,2],
-       cluster = as.factor(sce$Clusters))) + 
-  geom_point(aes(tSNE1, tSNE2, colour = cluster))
-
-ggplot(data.frame(tSNE1 = reducedDims(sce)$TSNE[,1],
-       tSNE2 = reducedDims(sce)$TSNE[,2],
-       OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) + 
-  geom_point(aes(tSNE1, tSNE2, colour = OLFM4)) +
-  scale_color_viridis_c()
 ```
 
 # Velocyto estimation
@@ -81,8 +67,7 @@ cell.colors <- cols[as.numeric(clusters.named)]
 names(cell.colors) <- names(clusters.named)
 
 pca.velocity.plot(rvel.cd, cell.colors=ac(cell.colors,alpha=0.7),
-                  cex=1.2, pcount = 1, show.grid.flow = TRUE, nPcs = 2,
-                  arrow.scale = 2)
+                  cex=1.2, pcount = 1, show.grid.flow = TRUE, nPcs = 2)
 
 set.seed(12345)
 tSNE.velocity.plot(rvel.cd,
@@ -103,12 +88,4 @@ ggplot(data.frame(tSNE1 = emb[,1],
                   cluster = as.factor(sce$Clusters))) + 
   geom_point(aes(tSNE1, tSNE2, colour = cluster)) +
   scale_color_manual(values = cols)
-
-ggplot(data.frame(tSNE1 = emb[,1],
-                  tSNE2 = emb[,2], 
-                  OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) + 
-  geom_point(aes(tSNE1, tSNE2, colour = OLFM4)) +
-  scale_color_viridis_c()
-
-
 ```

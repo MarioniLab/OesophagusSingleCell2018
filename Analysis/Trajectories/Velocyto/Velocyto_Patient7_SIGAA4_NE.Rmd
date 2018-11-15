@@ -1,13 +1,13 @@
 ---
-title: "Velocyto SIGAF11 NE Patient 5"
+title: "Velocyto SIGAA4 NE Patient 7"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
   html_document:
     toc: true
     toc_depth: 2
-    knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Velocyto/Patient5_SIGAF11_NE.html') })
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Velocyto/Patient7_SIGAA4_NE.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -16,20 +16,20 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Read in the data and library
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 library(velocyto.R)
 library(RColorBrewer)
 library(Rtsne)
 library(scater)
-loom.data <- read.loom.matrices("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Old/Detailed_analysis/Stem_cells/velocyto/SIGAF11.loom")
+loom.data <- read.loom.matrices("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Velocyto/SIGAA4.loom")
 
 # Load filtered counts
 sce <- readRDS("../../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
-sce <- sce$Patient5_SIGAF11_NE
+sce <- sce$Patient7_SIGAA4_NE
 sce <- normalize(sce)
 
 spliced.dat <- loom.data$spliced
-spliced.dat <- spliced.dat[,paste("SIGAF11:", sub("-1", "x", sce$Barcode), sep = "")]
+spliced.dat <- spliced.dat[,paste("SIGAA4:", sub("-1", "x", sce$Barcode), sep = "")]
 
 unspliced.dat <- loom.data$unspliced
 unspliced.dat <- unspliced.dat[,colnames(spliced.dat)]
@@ -58,17 +58,16 @@ fit.quantile <- 0.05
 rvel.cd <- gene.relative.velocity.estimates(spliced.dat,
                                             unspliced.dat,
                                             deltaT=1,
-                                            kCells=3,
+                                            kCells=10,
                                             kGenes=1,
                                             fit.quantile=fit.quantile)
 
-cols <- as.vector(brewer.pal(n = 8,"Set3"))
+cols <- as.vector(brewer.pal(n = 10,"Set3"))
 cell.colors <- cols[as.numeric(clusters.named)]
 names(cell.colors) <- names(clusters.named)
 
 pca.velocity.plot(rvel.cd, cell.colors=ac(cell.colors,alpha=0.7),
-                  cex=1.2, pcount = 1, show.grid.flow = TRUE, nPcs = 2,
-                  arrow.scale = 2)
+                  cex=1.2, pcount = 1, show.grid.flow = TRUE, nPcs = 2)
 
 set.seed(12345)
 tSNE.velocity.plot(rvel.cd,
