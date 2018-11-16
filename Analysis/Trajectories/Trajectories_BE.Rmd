@@ -265,61 +265,39 @@ ggplot(data.frame(UMAP1 = umap.all$layout[,1],
   geom_point(aes(x = UMAP1, y = UMAP2, colour = NCL)) + scale_colour_viridis()
 ```
 
-# Monocle
+# Find genes that correlate with branches
 
-```{r monocle, eval = FALSE}
-cds <- monocle::newCellDataSet(cellData = corrected)
+```{r}
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = DC1, y = DC2, color = cluster))
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC3 = dm$DC3,
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = DC1, y = DC3, color = cluster))
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC4 = dm$DC4,
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = DC1, y = DC4, color = cluster))
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC5 = dm$DC5,
+                  cluster = as.factor(colData(sce)$Tissue_cluster))) + 
+  geom_point(aes(x = DC1, y = DC5, color = cluster))
+
+# Diffusion pseudotime
+dpt1 <- DPT(dm = dm, tips = c(which.max(entropy)))
+
+plot(dpt1, root = 2, paths_to = 1, col_by ='branch')
+dpt2 <- branch_divide(dpt1, 1:3)
+plot(dpt2, col_by ='branch')
+
+ggplot(data.frame(DC1 = dm$DC1,
+                  DC2 = dm$DC2,
+                  dpt = dpt1$DPT1093)) + 
+  geom_point(aes(x = DC1, y = DC2, color = dpt)) + 
+  scale_colour_viridis_c()
 ```
-
-# StemID
-
-```{r stem_id, eval=FALSE}
-source("../../../RaceID3_StemID2/RaceID3_StemID2_class.R")
-
-# Run StemID on cells from Patient3
-sce <- sce[,sce$Patient == "Patient3"]
-sce <- sce[Matrix::rowMeans(counts(sce)) > 0.1,]
-
-# Find highly variable genes
-HVgenes <- HVG(sce)
-
-sc <- SCseq(as.data.frame(as.matrix(counts(sce)[HVgenes,])))
-# For normalized data, pseudocount of 0.1 is added for entropy calculation
-sc@ndata <- as.data.frame(as.matrix(2^(logcounts(sce)[HVgenes,]) - 1 + 0.1))
-sc <- clustexp(sc, FSelect = FALSE)
-sc <- findoutliers(sc)
-sc <- rfcorrect(sc,rfseed=12345,final=TRUE,nbfactor=5)
-sc <- comptsne(sc,rseed=15555,sammonmap=FALSE,initial_cmd=TRUE)
-
-ggplot(data.frame(tsne1 = sc@tsne$V1,
-                  tsne2 = sc@tsne$V2,
-                  cluster = as.factor(sc@cluster$kpart))) + 
-  geom_point(aes(x = tsne1, y = tsne2, colour = cluster))
-
-ggplot(data.frame(tsne1 = sc@tsne$V1,
-                  tsne2 = sc@tsne$V2,
-                  cluster = as.factor(sce$Tissue_cluster))) + 
-  geom_point(aes(x = tsne1, y = tsne2, colour = cluster))
-
-ggplot(data.frame(tsne1 = sc@tsne$V1,
-                  tsne2 = sc@tsne$V2,
-                  OLFM4 = logcounts(sce)[rowData(sce)$Symbol == "OLFM4",])) +
-  geom_point(aes(x = tsne1, y = tsne2, colour = OLFM4)) + scale_colour_viridis()
-
-ltr <- Ltree(sc)
-ltr <- compentropy(ltr)
-ltr <- projcells(ltr, cthr = 0, nmode = FALSE)
-ltr <- projback(ltr, fast = TRUE)
-ltr <- lineagetree(ltr,pthr=0.01, nmode=FALSE, fast=TRUE)
-ltr <- comppvalue(ltr,pethr=0.01, nmode=FALSE, fast=TRUE)
-plotmap(ltr)
-plotlinkpv(ltr)
-x <- compscore(ltr,nn=1,scthr=.3)
-
-# Plot the StemID score for each cluster
-ggplot(data.frame(score = x$StemIDscore,
-                  clust.names = names(x$StemIDscore))) +
-  geom_col(aes(clust.names, score))
-```
-
-
