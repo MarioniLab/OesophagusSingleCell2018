@@ -258,5 +258,19 @@ write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_singl
 ```{r}
 # Select cells for analysis
 cur_sce <- sce[,grepl("BE|SMG|GC|D2", colData(sce)$Tissue)]
-ggplot()
+ggplot(data.frame(tSNE1 = reducedDims(cur_sce)$TSNE[,1],
+                  tSNE2 = reducedDims(cur_sce)$TSNE[,2],
+                  tissue = colData(cur_sce)$Tissue)) +
+  geom_point(aes(tSNE1, tSNE2, colour = tissue))
+
+ggplot(data.frame(tSNE1 = reducedDims(cur_sce)$TSNE[,1],
+                  tSNE2 = reducedDims(cur_sce)$TSNE[,2],
+                  cluster = as.factor(colData(cur_sce)$Global_cluster))) +
+  geom_point(aes(tSNE1, tSNE2, colour = cluster)) + 
+  scale_color_manual(values = c(brewer.pal(n = 8, name = "Set1"),
+                                brewer.pal(n = 8, name = "Set2"),
+                                brewer.pal(n = 8, name = "Set3")))
+
+cur_sce <- cur_sce[,colData(cur_sce)$Global_cluster %in% c(15, 13, 2, 1)]
+
 ```
