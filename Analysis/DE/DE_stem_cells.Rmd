@@ -290,44 +290,50 @@ tsne <- Rtsne(t(corrected), pca = FALSE)
 umap.cor <- umap(t(corrected))
 
 # Visualize results
-ggplot(data.frame(tSNE1 = umap.cor$layout[,1],
-                  tSNE2 = umap.cor$layout[,2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[,1],
+                  UMAP1 = umap.cor$layout[,2],
+                  cluster = as.factor(colData(cur_sce)$Tissue))) +
+  geom_point(aes(UMAP1, UMAP1, colour = cluster)) + 
+  scale_color_manual(values = c(brewer.pal(n = 8, name = "Set1")))
+
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
                   cluster = as.factor(colData(cur_sce)$Tissue))) +
   geom_point(aes(tSNE1, tSNE2, colour = cluster)) + 
   scale_color_manual(values = c(brewer.pal(n = 8, name = "Set1")))
 
-ggplot(data.frame(tSNE1 = umap.cor$layout[,1],
-                  tSNE2 = umap.cor$layout[,2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[,1],
+                  UMAP2 = umap.cor$layout[,2],
                   patient = as.factor(colData(cur_sce)$Patient))) +
-  geom_point(aes(tSNE1, tSNE2, colour = patient)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = patient)) + 
   scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
 
 # Visualize only BE
-ggplot(data.frame(tSNE1 = umap.cor$layout[colData(cur_sce)$Tissue == "BE",1],
-                  tSNE2 = umap.cor$layout[colData(cur_sce)$Tissue == "BE",2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[colData(cur_sce)$Tissue == "BE",1],
+                  UMAP2 = umap.cor$layout[colData(cur_sce)$Tissue == "BE",2],
                   patient = as.factor(colData(cur_sce[,colData(cur_sce)$Tissue == "BE"])$Patient))) +
-  geom_point(aes(tSNE1, tSNE2, colour = patient)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = patient)) + 
   scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
 
 # Visualize only GC
-ggplot(data.frame(tSNE1 = umap.cor$layout[colData(cur_sce)$Tissue == "GC",1],
-                  tSNE2 = umap.cor$layout[colData(cur_sce)$Tissue == "GC",2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[colData(cur_sce)$Tissue == "GC",1],
+                  UMAP2 = umap.cor$layout[colData(cur_sce)$Tissue == "GC",2],
                   patient = as.factor(colData(cur_sce[,colData(cur_sce)$Tissue == "GC"])$Patient))) +
-  geom_point(aes(tSNE1, tSNE2, colour = patient)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = patient)) + 
   scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
 
 # Visualize only SMG
-ggplot(data.frame(tSNE1 = umap.cor$layout[colData(cur_sce)$Tissue == "SMG",1],
-                  tSNE2 = umap.cor$layout[colData(cur_sce)$Tissue == "SMG",2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[colData(cur_sce)$Tissue == "SMG",1],
+                  UMAP2 = umap.cor$layout[colData(cur_sce)$Tissue == "SMG",2],
                   patient = as.factor(colData(cur_sce[,colData(cur_sce)$Tissue == "SMG"])$Patient))) +
-  geom_point(aes(tSNE1, tSNE2, colour = patient)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = patient)) + 
   scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
 
 # Visualize only D2
-ggplot(data.frame(tSNE1 = umap.cor$layout[colData(cur_sce)$Tissue == "D2",1],
-                  tSNE2 = umap.cor$layout[colData(cur_sce)$Tissue == "D2",2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[colData(cur_sce)$Tissue == "D2",1],
+                  UMAP2 = umap.cor$layout[colData(cur_sce)$Tissue == "D2",2],
                   patient = as.factor(colData(cur_sce[,colData(cur_sce)$Tissue == "D2"])$Patient))) +
-  geom_point(aes(tSNE1, tSNE2, colour = patient)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = patient)) + 
   scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
 
 # Perform new clustering
@@ -335,16 +341,16 @@ set.seed(1234)
 g <- buildSNNGraph(corrected, k = 15)
 cluster <- igraph::cluster_louvain(g)$membership
 
-ggplot(data.frame(tSNE1 = umap.cor$layout[,1],
-                  tSNE2 = umap.cor$layout[,2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[,1],
+                  UMAP2 = umap.cor$layout[,2],
                   cluster = as.factor(cluster))) +
-  geom_point(aes(tSNE1, tSNE2, colour = cluster)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = cluster)) + 
   scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
 
-ggplot(data.frame(tSNE1 = umap.cor$layout[,1],
-                  tSNE2 = umap.cor$layout[,2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[,1],
+                  UMAP2 = umap.cor$layout[,2],
                   gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "OLFM4",])) +
-  geom_point(aes(tSNE1, tSNE2, colour = gene)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = gene)) + 
   scale_color_viridis_c()
 
 table(cluster, colData(cur_sce)$Tissue, colData(cur_sce)$Patient)
@@ -367,10 +373,10 @@ for(i in c("BE", "GC", "SMG", "D2")){
   entropy_vector[paste(sce_i$Patient, sce_i$Tissue, sce_i$Barcode, sep = "_")] <- entropy
 }
 
-ggplot(data.frame(tSNE1 = umap.cor$layout[,1],
-                  tSNE2 = umap.cor$layout[,2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[,1],
+                  UMAP2 = umap.cor$layout[,2],
                   entropy = entropy_vector)) +
-  geom_point(aes(tSNE1, tSNE2, colour = entropy)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = entropy)) + 
   scale_color_viridis_c()
 ```
 
@@ -423,23 +429,23 @@ cur_out$GC <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.1,]
 cur_out$GC$Genename <- rowData(sce.stem)$Symbol[match(rownames(cur_out$GC), rowData(sce.stem)$ID)]
 
 # Visualize gene expression
-ggplot(data.frame(tSNE1 = umap.cor$layout[cluster == 1,1],
-                  tSNE2 = umap.cor$layout[cluster == 1,2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[cluster == 1,1],
+                  UMAP2 = umap.cor$layout[cluster == 1,2],
                   tissue = cur_sce$Tissue[cluster == 1])) +
-  geom_point(aes(tSNE1, tSNE2, colour = tissue))
+  geom_point(aes(UMAP1, UMAP2, colour = tissue))
 
-ggplot(data.frame(tSNE1 = umap.cor$layout[cluster == 1,1],
-                  tSNE2 = umap.cor$layout[cluster == 1,2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[cluster == 1,1],
+                  UMAP2 = umap.cor$layout[cluster == 1,2],
                   gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "S100A10",
                                             cluster == 1])) +
-  geom_point(aes(tSNE1, tSNE2, colour = gene)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = gene)) + 
   scale_color_viridis_c()
 
-ggplot(data.frame(tSNE1 = umap.cor$layout[cluster == 1,1],
-                  tSNE2 = umap.cor$layout[cluster == 1,2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[cluster == 1,1],
+                  UMAP2 = umap.cor$layout[cluster == 1,2],
                   gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "GHRL",
                                             cluster == 1])) +
-  geom_point(aes(tSNE1, tSNE2, colour = gene)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = gene)) + 
   scale_color_viridis_c()
 
 # Save Excel 
@@ -494,25 +500,100 @@ cur_out$D2 <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.1,]
 cur_out$D2$Genename <- rowData(sce.stem)$Symbol[match(rownames(cur_out$D2), rowData(sce.stem)$ID)]
 
 # Visualize gene expression
-ggplot(data.frame(tSNE1 = umap.cor$layout[cluster == 6,1],
-                  tSNE2 = umap.cor$layout[cluster == 6,2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[cluster == 6,1],
+                  UMAP2 = umap.cor$layout[cluster == 6,2],
                   tissue = cur_sce$Tissue[cluster == 6])) +
-  geom_point(aes(tSNE1, tSNE2, colour = tissue))
+  geom_point(aes(UMAP1, UMAP2, colour = tissue))
 
-ggplot(data.frame(tSNE1 = umap.cor$layout[cluster == 6,1],
-                  tSNE2 = umap.cor$layout[cluster == 6,2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[cluster == 6,1],
+                  UMAP2 = umap.cor$layout[cluster == 6,2],
                   gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "REG1A",
                                             cluster == 6])) +
-  geom_point(aes(tSNE1, tSNE2, colour = gene)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = gene)) + 
   scale_color_viridis_c()
 
-ggplot(data.frame(tSNE1 = umap.cor$layout[cluster == 6,1],
-                  tSNE2 = umap.cor$layout[cluster == 6,2],
+ggplot(data.frame(UMAP1 = umap.cor$layout[cluster == 6,1],
+                  UMAP2 = umap.cor$layout[cluster == 6,2],
                   gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "TFF1",
                                             cluster == 6])) +
-  geom_point(aes(tSNE1, tSNE2, colour = gene)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = gene)) + 
   scale_color_viridis_c()
 
 # Save Excel 
 write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Stem_cells/DE_D2_vs_BE_stem_cells_cluster6.xlsx")
+```
+
+# BE Cluster 6 vs GC Cluster 1
+
+```{r}
+sce.stem <- cur_sce[,(cur_sce$Tissue == "GC" & cluster == 1) |
+                      (cur_sce$Tissue == "BE" & cluster == 6)]
+table(sce.stem$Tissue, sce.stem$Patient)
+
+# Differential expression
+# Sum counts with each batch and group
+mat <- matrix(data = NA, ncol = length(unique(paste(colData(sce.stem)$Patient, 
+                                        colData(sce.stem)$Tissue, sep = "_"))), 
+              nrow = nrow(counts(sce.stem)))
+rownames(mat) <- rownames(counts(sce.stem))
+colnames(mat) <- unique(paste(colData(sce.stem)$Patient, 
+                                colData(sce.stem)$Tissue, sep = "_"))
+  
+for(j in colnames(mat)){
+  cur_patient <- unlist(strsplit(j, "_"))[1]
+  cur_tissue <- unlist(strsplit(j, "_"))[2]
+  mat[,j] <- Matrix::rowSums(counts(sce.stem)[,colData(sce.stem)$Patient == cur_patient &
+                                                colData(sce.stem)$Tissue == cur_tissue]) 
+}
+  
+# Perform differential testing
+y <- DGEList(counts=mat,
+             group=sapply(colnames(mat), 
+                          function(n){unlist(strsplit(n, "_"))[1]}))
+y <- calcNormFactors(y)
+design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
+colnames(design) <- c("BE", "GC")
+y <- estimateDisp(y,design)
+  
+fit <- glmQLFit(y,design, robust = TRUE)
+qlf <- glmTreat(fit,coef=2, lfc = 0.5, 
+                contrast = makeContrasts(GC - BE, levels = design))
+cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
+
+# Save markers
+cur_out <- list()
+cur_out$BE <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.1,]
+cur_out$BE$Genename <- rowData(sce.stem)$Symbol[match(rownames(cur_out$BE), rowData(sce.stem)$ID)]
+cur_out$GC <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.1,]
+cur_out$GC$Genename <- rowData(sce.stem)$Symbol[match(rownames(cur_out$GC), rowData(sce.stem)$ID)]
+
+# Visualize gene expression
+cur_cluster <- (cur_sce$Tissue == "GC" & cluster == 1) |
+                      (cur_sce$Tissue == "BE" & cluster == 6)
+ggplot(data.frame(UMAP1 = umap.cor$layout[cur_cluster,1],
+                  UMAP2 = umap.cor$layout[cur_cluster,2],
+                  tissue = cur_sce$Tissue[cur_cluster])) +
+  geom_point(aes(UMAP1, UMAP2, colour = tissue))
+
+ggplot(data.frame(UMAP1 = umap.cor$layout[cur_cluster,1],
+                  UMAP2 = umap.cor$layout[cur_cluster,2],
+                  patient = cur_sce$Patient[cur_cluster])) +
+  geom_point(aes(UMAP1, UMAP2, colour = patient))
+
+ggplot(data.frame(UMAP1 = umap.cor$layout[cur_cluster,1],
+                  UMAP2 = umap.cor$layout[cur_cluster,2],
+                  gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "REG4",
+                                            cur_cluster])) +
+  geom_point(aes(UMAP1, UMAP2, colour = gene)) + 
+  scale_color_viridis_c()
+
+ggplot(data.frame(UMAP1 = umap.cor$layout[cur_cluster,1],
+                  UMAP2 = umap.cor$layout[cur_cluster,2],
+                  gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "CXCL17",
+                                            cur_cluster])) +
+  geom_point(aes(UMAP1, UMAP2, colour = gene)) + 
+  scale_color_viridis_c()
+
+# Save Excel 
+write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Stem_cells/DE_GC_cluster1_vs_BE_cluster6.xlsx")
 ```
