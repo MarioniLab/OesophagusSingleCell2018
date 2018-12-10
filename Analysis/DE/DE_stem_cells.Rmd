@@ -302,6 +302,34 @@ ggplot(data.frame(tSNE1 = umap.cor$layout[,1],
   geom_point(aes(tSNE1, tSNE2, colour = patient)) + 
   scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
 
+# Visualize only BE
+ggplot(data.frame(tSNE1 = umap.cor$layout[colData(cur_sce)$Tissue == "BE",1],
+                  tSNE2 = umap.cor$layout[colData(cur_sce)$Tissue == "BE",2],
+                  patient = as.factor(colData(cur_sce[,colData(cur_sce)$Tissue == "BE"])$Patient))) +
+  geom_point(aes(tSNE1, tSNE2, colour = patient)) + 
+  scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
+
+# Visualize only GC
+ggplot(data.frame(tSNE1 = umap.cor$layout[colData(cur_sce)$Tissue == "GC",1],
+                  tSNE2 = umap.cor$layout[colData(cur_sce)$Tissue == "GC",2],
+                  patient = as.factor(colData(cur_sce[,colData(cur_sce)$Tissue == "GC"])$Patient))) +
+  geom_point(aes(tSNE1, tSNE2, colour = patient)) + 
+  scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
+
+# Visualize only SMG
+ggplot(data.frame(tSNE1 = umap.cor$layout[colData(cur_sce)$Tissue == "SMG",1],
+                  tSNE2 = umap.cor$layout[colData(cur_sce)$Tissue == "SMG",2],
+                  patient = as.factor(colData(cur_sce[,colData(cur_sce)$Tissue == "SMG"])$Patient))) +
+  geom_point(aes(tSNE1, tSNE2, colour = patient)) + 
+  scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
+
+# Visualize only D2
+ggplot(data.frame(tSNE1 = umap.cor$layout[colData(cur_sce)$Tissue == "D2",1],
+                  tSNE2 = umap.cor$layout[colData(cur_sce)$Tissue == "D2",2],
+                  patient = as.factor(colData(cur_sce[,colData(cur_sce)$Tissue == "D2"])$Patient))) +
+  geom_point(aes(tSNE1, tSNE2, colour = patient)) + 
+  scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
+
 # Perform new clustering
 g <- buildSNNGraph(corrected, k = 15)
 cluster <- igraph::cluster_louvain(g)$membership
@@ -312,5 +340,29 @@ ggplot(data.frame(tSNE1 = umap.cor$layout[,1],
   geom_point(aes(tSNE1, tSNE2, colour = cluster)) + 
   scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
 
-table(cluster, colData(cur_sce)$Tissue)
+ggplot(data.frame(tSNE1 = umap.cor$layout[,1],
+                  tSNE2 = umap.cor$layout[,2],
+                  gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "OLFM4",])) +
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) + 
+  scale_color_viridis_c()
+
+table(cluster, colData(cur_sce)$Tissue, colData(cur_sce)$Patient)
+```
+
+# Calculate Entropy for each sample
+
+```{r}
+rm(sce)
+entropy_vector <- vector(length = ncol(cur_sce))
+names(entropy_vector) <- paste(cur_sce$Patient, cur_sce$Tissue, cur_sce$Barcode, sep = "_")
+
+for(i in c("BE", "GC", "SMG", "D2")){
+  sce_i <- cur_sce[,colData(cur_sce)$Tissue == i]
+  cur_counts <- 2^(logcounts(sce_i)) - 1 + 0.1
+  probs   <- t(t(cur_counts)/Matrix::colSums(cur_counts))
+  entropy <- -apply(probs*log(probs)/log(nrow(sce_i)),2,sum)
+
+  entropy_vector[paste(sce_i$Patient, sce_i$Tissue, sce_i$Barcode, sep = "_")] <- entropy
+}
+
 ```
