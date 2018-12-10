@@ -1,8 +1,13 @@
 ---
 title: "Differential expression in stem cell compartment"
 author: "Nils Eling"
-date: "10/09/2018"
-output: html_document
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/DE_stem_cells.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -13,7 +18,7 @@ This script performs differential expression between the stem cells of different
 
 ## Read in the data 
 
-```{r data}
+```{r data, message=FALSE}
 library(scater)
 library(scran)
 library(edgeR)
@@ -248,156 +253,10 @@ cur_out$D2$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$D2), rowData(s
 write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Cluster_based/BE_vs_D2.xlsx")
 ```
 
-# Differential expression testing Patient 12
+# Select cells based on Entropy measure
 
-```{r patient12}
-cur_sce <- sce.sub[,sce.sub$Patient == "Patient12"]
-cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
-cur_sce <- normalise(cur_sce)
-
-markers <- marker.detection(cur_sce, clusters = cur_sce$Tissue)
-
-write.xlsx(markers, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Patient12/All_markers.xlsx")
-```
-
-# DE between SMG and BE
-
-```{r SMG_BE}
-# BE C4 vs SMG C5
-cur_sce <- sce[,(colData(sce)$Tissue == "BE" & colData(sce)$Tissue_cluster == 4) |
-                 (colData(sce)$Tissue == "SMG" & colData(sce)$Tissue_cluster == 5)]
-table(colData(cur_sce)$Tissue, colData(cur_sce)$Patient)
-
-cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
-cur_sce <- normalize(cur_sce)
-  
-# Sum counts with each batch and group
-mat <- matrix(data = NA, ncol = length(unique(paste(colData(cur_sce)$Patient, 
-                                        colData(cur_sce)$Tissue, sep = "_"))), 
-              nrow = nrow(counts(cur_sce)))
-rownames(mat) <- rownames(counts(cur_sce))
-colnames(mat) <- unique(paste(colData(cur_sce)$Patient, 
-                                colData(cur_sce)$Tissue, sep = "_"))
-  
-for(j in colnames(mat)){
-  cur_patient <- unlist(strsplit(j, "_"))[1]
-  cur_tissue <- unlist(strsplit(j, "_"))[2]
-  mat[,j] <- Matrix::rowSums(counts(cur_sce)[,colData(cur_sce)$Patient == cur_patient &
-                                                colData(cur_sce)$Tissue == cur_tissue]) 
-}
-  
-# Perform differential testing
-y <- DGEList(counts=mat,
-             group=sapply(colnames(mat), 
-                          function(n){unlist(strsplit(n, "_"))[1]}))
-y <- calcNormFactors(y)
-design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
-colnames(design) <- c("BE", "SMG")
-y <- estimateDisp(y,design)
-  
-fit <- glmQLFit(y,design, robust = TRUE)
-qlf <- glmTreat(fit,coef=2, lfc = 0.5, 
-                contrast = makeContrasts(SMG - BE, levels = design))
-cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
-
-# Save markers
-cur_out <- list()
-cur_out$BE <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.01,]
-cur_out$BE$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$BE), rowData(sce)$ID)]
-cur_out$SMG <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.01,]
-cur_out$SMG$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$SMG), rowData(sce)$ID)]
-
-write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Cluster_based/BE-C4_vs_SMG-C5.xlsx")
-
-# BE C4 vs SMG C10
-cur_sce <- sce[,(colData(sce)$Tissue == "BE" & colData(sce)$Tissue_cluster == 4) |
-                 (colData(sce)$Tissue == "SMG" & colData(sce)$Tissue_cluster == 10)]
-table(colData(cur_sce)$Tissue, colData(cur_sce)$Patient)
-
-cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
-cur_sce <- normalize(cur_sce)
-  
-# Sum counts with each batch and group
-mat <- matrix(data = NA, ncol = length(unique(paste(colData(cur_sce)$Patient, 
-                                        colData(cur_sce)$Tissue, sep = "_"))), 
-              nrow = nrow(counts(cur_sce)))
-rownames(mat) <- rownames(counts(cur_sce))
-colnames(mat) <- unique(paste(colData(cur_sce)$Patient, 
-                                colData(cur_sce)$Tissue, sep = "_"))
-  
-for(j in colnames(mat)){
-  cur_patient <- unlist(strsplit(j, "_"))[1]
-  cur_tissue <- unlist(strsplit(j, "_"))[2]
-  mat[,j] <- Matrix::rowSums(counts(cur_sce)[,colData(cur_sce)$Patient == cur_patient &
-                                                colData(cur_sce)$Tissue == cur_tissue]) 
-}
-  
-# Perform differential testing
-y <- DGEList(counts=mat,
-             group=sapply(colnames(mat), 
-                          function(n){unlist(strsplit(n, "_"))[1]}))
-y <- calcNormFactors(y)
-design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
-colnames(design) <- c("BE", "SMG")
-y <- estimateDisp(y,design)
-  
-fit <- glmQLFit(y,design, robust = TRUE)
-qlf <- glmTreat(fit,coef=2, lfc = 0.5, 
-                contrast = makeContrasts(SMG - BE, levels = design))
-cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
-
-# Save markers
-cur_out <- list()
-cur_out$BE <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.01,]
-cur_out$BE$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$BE), rowData(sce)$ID)]
-cur_out$SMG <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.01,]
-cur_out$SMG$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$SMG), rowData(sce)$ID)]
-
-write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Cluster_based/BE-C4_vs_SMG-C10.xlsx")
-
-# BE C4 vs SMG C13
-cur_sce <- sce[,(colData(sce)$Tissue == "BE" & colData(sce)$Tissue_cluster == 4) |
-                 (colData(sce)$Tissue == "SMG" & colData(sce)$Tissue_cluster == 13)]
-table(colData(cur_sce)$Tissue, colData(cur_sce)$Patient)
-
-cur_sce <- cur_sce[Matrix::rowMeans(logcounts(cur_sce)) > 0.1,]
-cur_sce <- normalize(cur_sce)
-  
-# Sum counts with each batch and group
-mat <- matrix(data = NA, ncol = length(unique(paste(colData(cur_sce)$Patient, 
-                                        colData(cur_sce)$Tissue, sep = "_"))), 
-              nrow = nrow(counts(cur_sce)))
-rownames(mat) <- rownames(counts(cur_sce))
-colnames(mat) <- unique(paste(colData(cur_sce)$Patient, 
-                                colData(cur_sce)$Tissue, sep = "_"))
-  
-for(j in colnames(mat)){
-  cur_patient <- unlist(strsplit(j, "_"))[1]
-  cur_tissue <- unlist(strsplit(j, "_"))[2]
-  mat[,j] <- Matrix::rowSums(counts(cur_sce)[,colData(cur_sce)$Patient == cur_patient &
-                                                colData(cur_sce)$Tissue == cur_tissue]) 
-}
-  
-# Perform differential testing
-y <- DGEList(counts=mat,
-             group=sapply(colnames(mat), 
-                          function(n){unlist(strsplit(n, "_"))[1]}))
-y <- calcNormFactors(y)
-design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
-colnames(design) <- c("BE", "SMG")
-y <- estimateDisp(y,design)
-  
-fit <- glmQLFit(y,design, robust = TRUE)
-qlf <- glmTreat(fit,coef=2, lfc = 0.5, 
-                contrast = makeContrasts(SMG - BE, levels = design))
-cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
-
-# Save markers
-cur_out <- list()
-cur_out$BE <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.01,]
-cur_out$BE$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$BE), rowData(sce)$ID)]
-cur_out$SMG <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.01,]
-cur_out$SMG$Genename <- rowData(sce)$Symbol[match(rownames(cur_out$SMG), rowData(sce)$ID)]
-
-write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Cluster_based/BE-C4_vs_SMG-C13.xlsx")
+```{r}
+# Select cells for analysis
+cur_sce <- sce[,grepl("BE|SMG|GC|D2", colData(sce)$Tissue)]
+ggplot()
 ```
