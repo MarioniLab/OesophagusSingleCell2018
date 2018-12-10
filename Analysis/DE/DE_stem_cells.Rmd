@@ -25,6 +25,8 @@ library(edgeR)
 library(ggplot2)
 library(openxlsx)
 library(RColorBrewer)
+library(Rtsne)
+library(umap)
 source("../../Analysis/Functions/auxiliary.R")
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
@@ -273,4 +275,42 @@ ggplot(data.frame(tSNE1 = reducedDims(cur_sce)$TSNE[,1],
 
 cur_sce <- cur_sce[,colData(cur_sce)$Global_cluster %in% c(15, 13, 2, 1)]
 
+# Perform new batch correction
+sce.list <- split.sce(cur_sce, groups = unique(colData(cur_sce)$Sample), colData.name = "Sample")
+
+# Order so that BE is first
+sce.list <- sce.list[c(4,5,6,1,2,3,14,7,8,9,10,11,12,13)]
+cur_sce <- do.call("cbind", sce.list)
+
+corrected <- batch.correction(sce.list)
+
+# Compute tSNE
+set.seed(1234)
+tsne <- Rtsne(t(corrected), pca = FALSE)
+umap.cor <- umap(t(corrected))
+
+# Visualize results
+ggplot(data.frame(tSNE1 = umap.cor$layout[,1],
+                  tSNE2 = umap.cor$layout[,2],
+                  cluster = as.factor(colData(cur_sce)$Tissue))) +
+  geom_point(aes(tSNE1, tSNE2, colour = cluster)) + 
+  scale_color_manual(values = c(brewer.pal(n = 8, name = "Set1")))
+
+ggplot(data.frame(tSNE1 = umap.cor$layout[,1],
+                  tSNE2 = umap.cor$layout[,2],
+                  patient = as.factor(colData(cur_sce)$Patient))) +
+  geom_point(aes(tSNE1, tSNE2, colour = patient)) + 
+  scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
+
+# Perform new clustering
+g <- buildSNNGraph(corrected, k = 15)
+cluster <- igraph::cluster_louvain(g)$membership
+
+ggplot(data.frame(tSNE1 = umap.cor$layout[,1],
+                  tSNE2 = umap.cor$layout[,2],
+                  cluster = as.factor(cluster))) +
+  geom_point(aes(tSNE1, tSNE2, colour = cluster)) + 
+  scale_color_manual(values = c(brewer.pal(n = 12, name = "Set3")))
+
+table(cluster, colData(cur_sce)$Tissue)
 ```
