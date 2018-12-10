@@ -291,9 +291,9 @@ umap.cor <- umap(t(corrected))
 
 # Visualize results
 ggplot(data.frame(UMAP1 = umap.cor$layout[,1],
-                  UMAP1 = umap.cor$layout[,2],
+                  UMAP2 = umap.cor$layout[,2],
                   cluster = as.factor(colData(cur_sce)$Tissue))) +
-  geom_point(aes(UMAP1, UMAP1, colour = cluster)) + 
+  geom_point(aes(UMAP1, UMAP2, colour = cluster)) + 
   scale_color_manual(values = c(brewer.pal(n = 8, name = "Set1")))
 
 ggplot(data.frame(tSNE1 = tsne$Y[,1],
