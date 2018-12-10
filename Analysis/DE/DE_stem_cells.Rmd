@@ -445,3 +445,74 @@ ggplot(data.frame(tSNE1 = umap.cor$layout[cluster == 1,1],
 # Save Excel 
 write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Stem_cells/DE_GC_vs_BE_stem_cells_cluster1.xlsx")
 ```
+
+# Cluster 6
+
+```{r}
+sce.stem <- cur_sce[,cluster == 6]
+table(sce.stem$Tissue, sce.stem$Patient)
+
+# Remove the 2 SMG cells
+sce.stem <- sce.stem[,sce.stem$Tissue != "SMG" &
+                       sce.stem$Tissue != "GC"]
+
+# Differential expression
+# Sum counts with each batch and group
+mat <- matrix(data = NA, ncol = length(unique(paste(colData(sce.stem)$Patient, 
+                                        colData(sce.stem)$Tissue, sep = "_"))), 
+              nrow = nrow(counts(sce.stem)))
+rownames(mat) <- rownames(counts(sce.stem))
+colnames(mat) <- unique(paste(colData(sce.stem)$Patient, 
+                                colData(sce.stem)$Tissue, sep = "_"))
+  
+for(j in colnames(mat)){
+  cur_patient <- unlist(strsplit(j, "_"))[1]
+  cur_tissue <- unlist(strsplit(j, "_"))[2]
+  mat[,j] <- Matrix::rowSums(counts(sce.stem)[,colData(sce.stem)$Patient == cur_patient &
+                                                colData(sce.stem)$Tissue == cur_tissue]) 
+}
+  
+# Perform differential testing
+y <- DGEList(counts=mat,
+             group=sapply(colnames(mat), 
+                          function(n){unlist(strsplit(n, "_"))[1]}))
+y <- calcNormFactors(y)
+design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
+colnames(design) <- c("BE", "D2")
+y <- estimateDisp(y,design)
+  
+fit <- glmQLFit(y,design, robust = TRUE)
+qlf <- glmTreat(fit,coef=2, lfc = 0.5, 
+                contrast = makeContrasts(D2 - BE, levels = design))
+cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
+
+# Save markers
+cur_out <- list()
+cur_out$BE <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.1,]
+cur_out$BE$Genename <- rowData(sce.stem)$Symbol[match(rownames(cur_out$BE), rowData(sce.stem)$ID)]
+cur_out$D2 <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.1,]
+cur_out$D2$Genename <- rowData(sce.stem)$Symbol[match(rownames(cur_out$D2), rowData(sce.stem)$ID)]
+
+# Visualize gene expression
+ggplot(data.frame(tSNE1 = umap.cor$layout[cluster == 6,1],
+                  tSNE2 = umap.cor$layout[cluster == 6,2],
+                  tissue = cur_sce$Tissue[cluster == 6])) +
+  geom_point(aes(tSNE1, tSNE2, colour = tissue))
+
+ggplot(data.frame(tSNE1 = umap.cor$layout[cluster == 6,1],
+                  tSNE2 = umap.cor$layout[cluster == 6,2],
+                  gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "REG1A",
+                                            cluster == 6])) +
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) + 
+  scale_color_viridis_c()
+
+ggplot(data.frame(tSNE1 = umap.cor$layout[cluster == 6,1],
+                  tSNE2 = umap.cor$layout[cluster == 6,2],
+                  gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "TFF1",
+                                            cluster == 6])) +
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) + 
+  scale_color_viridis_c()
+
+# Save Excel 
+write.xlsx(cur_out, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Stem_cells/DE_D2_vs_BE_stem_cells_cluster6.xlsx")
+```
