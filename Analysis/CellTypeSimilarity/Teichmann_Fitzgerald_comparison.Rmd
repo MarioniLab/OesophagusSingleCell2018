@@ -28,4 +28,9 @@ library(Seurat)
 
 # Read in the Teichmann data
 T.data <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Teichman_data/Data/Oesophagus_QC_TSNE_alldonors.gz")
+
+# Strip out the data that we don't need for easier handeling
+T.data@data <- NULL
+T.data@scale.data <- NULL
+saveRDS(T.data, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Teichman_data/Data/Teichmann_data_small.rds")
 ```
