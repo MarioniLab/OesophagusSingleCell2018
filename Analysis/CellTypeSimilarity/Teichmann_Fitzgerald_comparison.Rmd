@@ -22,7 +22,7 @@ The first step is to select oesophagus cells from the Teichmann lab at 0-6 hours
 
 ## Select condition of interest
 
-```{r, select-condition, eval=FALSE}
+```{r select-condition, eval=FALSE}
 library(scran)
 library(Seurat)
 library(SingleCellExperiment)
@@ -63,7 +63,147 @@ saveRDS(T.sce, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cel
 I will do a quick analysis of the data to get an idea about the cell-types present and the patient effect.
 The first step is to normalize the data by pooling similar cells and deconvolving cell-specific normalization factors.
 
-```{r, analysis}
-T.sce <- readRDS()
-# Normalization 
+```{r analysis}
+library(scran)
+library(umap)
+library(ggplot2)
+library(RColorBrewer)
+library(Rtsne)
+source("../../Analysis/Functions/auxiliary.R")
+T.sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Teichman_data/Data/Teichmann_data_small.rds")
+
+# Normalization
+T.sce <- computeSumFactors(T.sce)
+T.sce <- normalize(T.sce)
+
+# Compute tSNE on the most highly variable genes
+HVGs <- HVG(T.sce)
+set.seed(1234)
+T.tsne <- Rtsne(t(as.matrix(logcounts(T.sce)[HVGs,])), perple)
+
+ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
+                  tSNE2 = T.tsne$Y[,2],
+                  patient = factor(T.sce$Donor))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = patient)) +
+  scale_color_brewer(palette = "Set1")
+
+# As expected, there is a strong patient effect
+# I will correct this using mnncorrect
+# Split sce object into individual patients
+sce.list <- split.sce(T.sce, unique(T.sce$Donor), colData.name = "Donor")
+corrected <- batch.correction(sce.list)
+T.sce <- do.call("cbind", sce.list)
+
+# Recalculate tSNE on corrected counts
+set.seed(1234)
+T.tsne <- Rtsne(t(corrected), perplexity = 100)
+
+ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
+                  tSNE2 = T.tsne$Y[,2],
+                  patient = factor(T.sce$Donor))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = patient)) +
+  scale_color_brewer(palette = "Set1")
+
+# There appears to be a remaining sample effect from Donor 296C
+```
+
+### Clustering and marker gene detection
+
+Here, I visualize the initial clustering and detect marker genes to determine the cell types in the samples.
+
+```{r marker-genes}
+# Visualization of original clustering results
+ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
+                  tSNE2 = T.tsne$Y[,2],
+                  clusters = factor(T.sce$bbknn.umap.clusters))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
+  scale_color_manual(values = c(brewer.pal(n = 8, "Set1"), 
+                                brewer.pal(n = 12, "Set3")))
+
+table(T.sce$Donor, T.sce$bbknn.umap.clusters)
+
+# Cluster 11 is primarily occupied by Donor 296C
+```
+
+This Donor effect is something that we have also seen. 
+bbknn and mnn don't seem to correct this effect which means it has to be something biological or a strong technical effect. 
+Is there a way to figure out what's special about this donor? 
+Do we also have cells from this donor?
+
+Next, I will find the marker genes for these groups.
+
+```{r marker-genes}
+marker.genes <- marker.detection(T.sce, clusters = T.sce$bbknn.umap.clusters)
+
+# Show some marker genes
+# Cluster 3
+rownames(marker.genes$`3`)[1:20]
+
+# Cluster 8
+rownames(marker.genes$`8`)[1:20]
+
+# Cluster 12
+rownames(marker.genes$`12`)[1:20]
+
+# Cluster 15
+rownames(marker.genes$`15`)[1:20]
+
+# Cluster 16
+rownames(marker.genes$`16`)[1:20]
+
+# Cluster 14
+rownames(marker.genes$`14`)[1:20]
+
+# Visualize the one marker gene for these cluster
+ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
+                  tSNE2 = T.tsne$Y[,2],
+                  gene = logcounts(T.sce)["IL1R2",])) + 
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
+ scale_color_viridis_c(name = "IL1R2")
+
+ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
+                  tSNE2 = T.tsne$Y[,2],
+                  gene = logcounts(T.sce)["MYEOV",])) + 
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
+ scale_color_viridis_c(name = "MYEOV")
+
+ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
+                  tSNE2 = T.tsne$Y[,2],
+                  gene = logcounts(T.sce)["KRT8",])) + 
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
+ scale_color_viridis_c(name = "KRT8")
+
+ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
+                  tSNE2 = T.tsne$Y[,2],
+                  gene = logcounts(T.sce)["AQP1",])) + 
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
+ scale_color_viridis_c(name = "AQP1")
+
+ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
+                  tSNE2 = T.tsne$Y[,2],
+                  gene = logcounts(T.sce)["VIM",])) + 
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
+ scale_color_viridis_c(name = "VIM")
+
+ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
+                  tSNE2 = T.tsne$Y[,2],
+                  gene = logcounts(T.sce)["CXCR4",])) + 
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
+ scale_color_viridis_c(name = "CXCR4")
+```
+
+Most of the small cluster would have been removed due to their expression of VIM.
+
+## Mapping the Teichmann data to our data
+
+I will next map the Teichmann data to the Fitsgerald data to compare cell type compositions between the two different datasets.
+
+```{r mapping}
+F.sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+
+# Select the condtions that we want to use for mapping
+F.sce <- F.sce[,F.sce$Tissue != "GOJ" & F.sce$Tissue != "SCJ"]
+
+# Split the data into individual batches
+
 ```
