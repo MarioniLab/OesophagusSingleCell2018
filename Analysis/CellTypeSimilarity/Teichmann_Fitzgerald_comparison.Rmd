@@ -63,7 +63,7 @@ saveRDS(T.sce, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cel
 I will do a quick analysis of the data to get an idea about the cell-types present and the patient effect.
 The first step is to normalize the data by pooling similar cells and deconvolving cell-specific normalization factors.
 
-```{r analysis}
+```{r analysis, message=FALSE}
 library(scran)
 library(umap)
 library(ggplot2)
@@ -79,7 +79,7 @@ T.sce <- normalize(T.sce)
 # Compute tSNE on the most highly variable genes
 HVGs <- HVG(T.sce)
 set.seed(1234)
-T.tsne <- Rtsne(t(as.matrix(logcounts(T.sce)[HVGs,])), perple)
+T.tsne <- Rtsne(t(as.matrix(logcounts(T.sce)[HVGs,])))
 
 ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
                   tSNE2 = T.tsne$Y[,2],
@@ -111,7 +111,7 @@ ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
 
 Here, I visualize the initial clustering and detect marker genes to determine the cell types in the samples.
 
-```{r marker-genes}
+```{r}
 # Visualization of original clustering results
 ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
                   tSNE2 = T.tsne$Y[,2],
@@ -198,12 +198,111 @@ Most of the small cluster would have been removed due to their expression of VIM
 
 I will next map the Teichmann data to the Fitsgerald data to compare cell type compositions between the two different datasets.
 
-```{r mapping}
+```{r mapping, fig.height=7, fig.width=7}
 F.sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 
 # Select the condtions that we want to use for mapping
 F.sce <- F.sce[,F.sce$Tissue != "GOJ" & F.sce$Tissue != "SCJ"]
 
+# Select the same set of genes for both datasets
+genes <- intersect(rownames(T.sce), rowData(F.sce)$Symbol)
+T.sce <- T.sce[genes,]
+F.sce <- F.sce[match(genes, rowData(F.sce)$Symbol),]
+rownames(F.sce) <- genes
+
 # Split the data into individual batches
+sce.list <- split.sce(F.sce, groups = unique(F.sce$Sample), colData.name = "Sample")
+
+# Add the Teichmann data to this list
+sce.list <- c(sce.list, split.sce(T.sce, unique(T.sce$Donor), colData.name = "Donor"))
+
+# Batch correction and merging
+corrected <- batch.correction(sce.list)
+F.sce <- do.call("cbind", split.sce(F.sce, groups = unique(F.sce$Sample), colData.name = "Sample"))
+T.sce <- do.call("cbind", split.sce(T.sce, groups = unique(T.sce$Donor), colData.name = "Donor"))
+
+# Visualization of mapped data
+set.seed(12345)
+tsne <- Rtsne(t(corrected), perplexity = 100)
+
+# Visualization of mapping results
+# Dataset source
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  dataset = factor(c(rep("Fitzgerald", ncol(F.sce)),
+                                     rep("Teichmann", ncol(T.sce)))))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = dataset, size = dataset)) +
+  scale_colour_manual(values = c("black", "red")) +
+  scale_size_manual(values = c(1,0.3))
+
+# Tissue type
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  dataset = factor(c(rep("Fitzgerald", ncol(F.sce)),
+                                     rep("Teichmann", ncol(T.sce)))),
+                  Tissue = factor(c(F.sce$Tissue,
+                                     rep("Oesophagus", ncol(T.sce)))))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = Tissue, size = dataset)) +
+  scale_colour_manual(values = brewer.pal(n = 8, "Set1")) +
+  scale_size_manual(values = c(1,0.3))
+
+# Patient
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  dataset = factor(c(rep("Fitzgerald", ncol(F.sce)),
+                                     rep("Teichmann", ncol(T.sce)))),
+                  Patient = factor(c(F.sce$Patient,
+                                     as.character(T.sce$Donor))))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = Patient, size = dataset)) +
+  scale_colour_manual(values = c(brewer.pal(n = 8, "Set1"),
+                                 brewer.pal(n = 8, "Set3"))) +
+  scale_size_manual(values = c(1,0.3))
+
+# Clusters
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  dataset = factor(c(rep("Fitzgerald", ncol(F.sce)),
+                                     rep("Teichmann", ncol(T.sce)))),
+                  Cluster = factor(c(F.sce$Tissue,
+                                     as.character(T.sce$bbknn.umap.clusters))))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = Cluster, size = dataset)) +
+  scale_colour_manual(values = c(brewer.pal(n = 8, "Set1"),
+                                 brewer.pal(n = 8, "Set3"),
+                                 brewer.pal(n = 8, "Paired"))) +
+  scale_size_manual(values = c(1,0.3))
+
+# Marker gene expression
+# Normal oesophagus
+for(i in c("KRT5", "KRT14", "KRT4", "ECM1", "KRT14")){
+  # Plot Fitzgerald data first
+  print(ggplot(data.frame(tSNE1 = tsne$Y[1:ncol(F.sce),1],
+                  tSNE2 = tsne$Y[1:ncol(F.sce),2],
+                  gene = logcounts(F.sce)[i,])) + 
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
+  scale_colour_viridis_c(name = paste(i, "Fitzgerald"))) 
+    
+  print(ggplot(data.frame(tSNE1 = tsne$Y[(ncol(F.sce)+1):(ncol(F.sce)+ncol(T.sce)),1],
+                  tSNE2 = tsne$Y[(ncol(F.sce)+1):(ncol(F.sce)+ncol(T.sce)),2],
+                  gene = logcounts(T.sce)[i,])) + 
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
+  scale_colour_viridis_c(name = paste(i, "Teichmann"))) 
+}
+
+
+# Gland cells
+for(i in c("KRT7", "TFF3", "MUC5B", "SLPI", "RBP1", "KRT23")){
+  # Plot Fitzgerald data first
+  print(ggplot(data.frame(tSNE1 = tsne$Y[1:ncol(F.sce),1],
+                  tSNE2 = tsne$Y[1:ncol(F.sce),2],
+                  gene = logcounts(F.sce)[i,])) + 
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
+  scale_colour_viridis_c(name = paste(i, "Fitzgerald"))) 
+    
+  print(ggplot(data.frame(tSNE1 = tsne$Y[(ncol(F.sce)+1):(ncol(F.sce)+ncol(T.sce)),1],
+                  tSNE2 = tsne$Y[(ncol(F.sce)+1):(ncol(F.sce)+ncol(T.sce)),2],
+                  gene = logcounts(T.sce)[i,])) + 
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
+  scale_colour_viridis_c(name = paste(i, "Teichmann")))
+}
 
 ```
