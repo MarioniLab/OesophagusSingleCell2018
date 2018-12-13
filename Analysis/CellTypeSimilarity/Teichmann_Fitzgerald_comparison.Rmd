@@ -22,15 +22,48 @@ The first step is to select oesophagus cells from the Teichmann lab at 0-6 hours
 
 ## Select condition of interest
 
-```{r, select-condition}
+```{r, select-condition, eval=FALSE}
 library(scran)
 library(Seurat)
+library(SingleCellExperiment)
 
 # Read in the Teichmann data
 T.data <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Teichman_data/Data/Oesophagus_QC_TSNE_alldonors.gz")
+T.meta <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Teichman_data/Data/oesophagus_QC_TSNE_alldonors_bbknn_UMAP_meta.gz")
 
-# Strip out the data that we don't need for easier handeling
+# Strip out the data that we don't need for easier handling
 T.data@data <- NULL
 T.data@scale.data <- NULL
-saveRDS(T.data, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Teichman_data/Data/Teichmann_data_small.rds")
+
+# Form a SingleCellExpression Object
+T.sce <- SingleCellExperiment(assays = list(counts = T.data@raw.data))
+
+# There seems to be a discrepancy between the cells in the metdata object and the Seurat object
+ncol(T.data@raw.data)
+nrow(T.meta)
+
+# I will therefore only retain the cells that are in the metadata object
+T.sce <- T.sce[,rownames(T.meta)]
+
+# Save the metadata in the colData slot
+colData(T.sce) <- DataFrame(T.meta) 
+
+# Since we are only interested in the 0h time-point, I subset the dataset to exactly this collection time
+T.sce <- T.sce[,T.sce$Time == "0h"]
+dim(T.sce)
+
+# I retain 17276 genes and 14478 cells
+
+# Save object
+saveRDS(T.sce, "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Teichman_data/Data/Teichmann_data_small.rds")
+```
+
+## Analysis of Teichmann data
+
+I will do a quick analysis of the data to get an idea about the cell-types present and the patient effect.
+The first step is to normalize the data by pooling similar cells and deconvolving cell-specific normalization factors.
+
+```{r, analysis}
+T.sce <- readRDS()
+# Normalization 
 ```
