@@ -202,7 +202,7 @@ I will next map the Teichmann data to the Fitsgerald data to compare cell type c
 F.sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 
 # Select the condtions that we want to use for mapping
-F.sce <- F.sce[,F.sce$Tissue != "GOJ" & F.sce$Tissue != "SCJ"]
+#F.sce <- F.sce[,F.sce$Tissue != "GOJ" & F.sce$Tissue != "SCJ"]
 
 # Select the same set of genes for both datasets
 genes <- intersect(rownames(T.sce), rowData(F.sce)$Symbol)
@@ -224,6 +224,7 @@ T.sce <- do.call("cbind", split.sce(T.sce, groups = unique(T.sce$Donor), colData
 # Visualization of mapped data
 set.seed(12345)
 tsne <- Rtsne(t(corrected), perplexity = 100)
+umap.all <- umap(t(corrected), )
 
 # Visualization of mapping results
 # Dataset source
@@ -235,6 +236,14 @@ ggplot(data.frame(tSNE1 = tsne$Y[,1],
   scale_colour_manual(values = c("black", "red")) +
   scale_size_manual(values = c(1,0.3))
 
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  dataset = factor(c(rep("Fitzgerald", ncol(F.sce)),
+                                     rep("Teichmann", ncol(T.sce)))))) + 
+  geom_point(aes(UMAP1, UMAP2, colour = dataset, size = dataset)) +
+  scale_colour_manual(values = c("black", "red")) +
+  scale_size_manual(values = c(1,0.3))
+
 # Tissue type
 ggplot(data.frame(tSNE1 = tsne$Y[,1],
                   tSNE2 = tsne$Y[,2],
@@ -243,6 +252,16 @@ ggplot(data.frame(tSNE1 = tsne$Y[,1],
                   Tissue = factor(c(F.sce$Tissue,
                                      rep("Oesophagus", ncol(T.sce)))))) + 
   geom_point(aes(tSNE1, tSNE2, colour = Tissue, size = dataset)) +
+  scale_colour_manual(values = brewer.pal(n = 8, "Set1")) +
+  scale_size_manual(values = c(1,0.3))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  dataset = factor(c(rep("Fitzgerald", ncol(F.sce)),
+                                     rep("Teichmann", ncol(T.sce)))),
+                  Tissue = factor(c(F.sce$Tissue,
+                                     rep("Oesophagus", ncol(T.sce)))))) + 
+  geom_point(aes(UMAP1, UMAP2, colour = Tissue, size = dataset)) +
   scale_colour_manual(values = brewer.pal(n = 8, "Set1")) +
   scale_size_manual(values = c(1,0.3))
 
@@ -258,6 +277,17 @@ ggplot(data.frame(tSNE1 = tsne$Y[,1],
                                  brewer.pal(n = 8, "Set3"))) +
   scale_size_manual(values = c(1,0.3))
 
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  dataset = factor(c(rep("Fitzgerald", ncol(F.sce)),
+                                     rep("Teichmann", ncol(T.sce)))),
+                  Patient = factor(c(F.sce$Patient,
+                                     as.character(T.sce$Donor))))) + 
+  geom_point(aes(UMAP1, UMAP2, colour = Patient, size = dataset)) +
+  scale_colour_manual(values = c(brewer.pal(n = 8, "Set1"),
+                                 brewer.pal(n = 8, "Set3"))) +
+  scale_size_manual(values = c(1,0.3))
+
 # Clusters
 ggplot(data.frame(tSNE1 = tsne$Y[,1],
                   tSNE2 = tsne$Y[,2],
@@ -266,6 +296,18 @@ ggplot(data.frame(tSNE1 = tsne$Y[,1],
                   Cluster = factor(c(F.sce$Tissue,
                                      as.character(T.sce$bbknn.umap.clusters))))) + 
   geom_point(aes(tSNE1, tSNE2, colour = Cluster, size = dataset)) +
+  scale_colour_manual(values = c(brewer.pal(n = 8, "Set1"),
+                                 brewer.pal(n = 8, "Set3"),
+                                 brewer.pal(n = 8, "Paired"))) +
+  scale_size_manual(values = c(1,0.3))
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  dataset = factor(c(rep("Fitzgerald", ncol(F.sce)),
+                                     rep("Teichmann", ncol(T.sce)))),
+                  Cluster = factor(c(F.sce$Tissue,
+                                     as.character(T.sce$bbknn.umap.clusters))))) + 
+  geom_point(aes(UMAP1, UMAP2, colour = Cluster, size = dataset)) +
   scale_colour_manual(values = c(brewer.pal(n = 8, "Set1"),
                                  brewer.pal(n = 8, "Set3"),
                                  brewer.pal(n = 8, "Paired"))) +
