@@ -96,7 +96,7 @@ T.sce <- do.call("cbind", sce.list)
 
 # Recalculate tSNE on corrected counts
 set.seed(1234)
-T.tsne <- Rtsne(t(corrected), perplexity = 100)
+T.tsne <- Rtsne(t(corrected), perplexity = 100, pca = FALSE)
 
 ggplot(data.frame(tSNE1 = T.tsne$Y[,1],
                   tSNE2 = T.tsne$Y[,2],
@@ -202,7 +202,7 @@ I will next map the Teichmann data to the Fitsgerald data to compare cell type c
 F.sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 
 # Select the condtions that we want to use for mapping
-#F.sce <- F.sce[,F.sce$Tissue != "GOJ" & F.sce$Tissue != "SCJ"]
+F.sce <- F.sce[,F.sce$Tissue == "NE" & F.sce$Tissue == "SMG"]
 
 # Select the same set of genes for both datasets
 genes <- intersect(rownames(T.sce), rowData(F.sce)$Symbol)
@@ -223,8 +223,8 @@ T.sce <- do.call("cbind", split.sce(T.sce, groups = unique(T.sce$Donor), colData
 
 # Visualization of mapped data
 set.seed(12345)
-tsne <- Rtsne(t(corrected), perplexity = 100)
-umap.all <- umap(t(corrected), )
+tsne <- Rtsne(t(corrected), perplexity = 100, pca = FALSE)
+umap.all <- umap(t(corrected))
 
 # Visualization of mapping results
 # Dataset source
