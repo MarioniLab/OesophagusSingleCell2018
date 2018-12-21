@@ -202,7 +202,7 @@ I will next map the Teichmann data to the Fitsgerald data to compare cell type c
 F.sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 
 # Select the condtions that we want to use for mapping
-F.sce <- F.sce[,F.sce$Tissue == "NE" & F.sce$Tissue == "SMG"]
+F.sce <- F.sce[,F.sce$Tissue == "NE" | F.sce$Tissue == "SMG"]
 
 # Select the same set of genes for both datasets
 genes <- intersect(rownames(T.sce), rowData(F.sce)$Symbol)

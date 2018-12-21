@@ -54,7 +54,7 @@ sce <- normalize(sce)
 corrected <- batch.correction(sce.list)
   
 # Compute tsne on corrected counts
-set.seed(1234)
+set.seed(12345)
 tsne <- Rtsne(t(corrected), pca = FALSE)
 umap <- umap(t(corrected))
 
@@ -99,6 +99,22 @@ ggplot(data.frame(UMAP1 = umap$layout[,1],
                   all = as.factor(paste(colData(sce)$Tissue, colData(sce)$Patient)))) + 
   geom_point(aes(UMAP1, UMAP2, colour = all), size = 0.5) + 
   scale_color_manual(values = col_vector)
+
+# Plot all patients individually 
+# Generate patient colour vector
+patient_vector <- c(brewer.pal(8, "Set1"), brewer.pal(8, "Set3"))[1:length(unique(sce$Patient))]
+names(patient_vector) <- unique(sce$Patient)
+
+for(i in c("NE", "GOJ", "SCJ", "BE", "GC", "D2", "SMG")){
+  cur_tsne <- tsne$Y[sce$Tissue == i,]
+  cur_patient <- sce$Patient[sce$Tissue == i]
+  
+  print(ggplot(data.frame(tSNE1 = cur_tsne[,1],
+                  tSNE2 = cur_tsne[,2],
+                  patient = cur_patient)) + 
+  geom_point(aes(tSNE1, tSNE2, colour = patient), size = 0.5) + 
+  scale_color_manual(values = patient_vector))
+}
   
 table(colData(sce)$Patient, colData(sce)$Tissue)
 ```
