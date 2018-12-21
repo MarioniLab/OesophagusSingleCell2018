@@ -25,6 +25,7 @@ library(DropletUtils)
 library(openxlsx)
 library(Rtsne)
 library(umap)
+library(RColorBrewer)
 source("../Analysis/Functions/auxiliary.R")
 ```
 
@@ -52,9 +53,6 @@ sce <- normalize(sce)
 # Batch correction
 corrected <- batch.correction(sce.list)
   
-# Save batch corrected counts in metdata
-metadata(sce)$corrected <- corrected
-  
 # Compute tsne on corrected counts
 set.seed(1234)
 tsne <- Rtsne(t(corrected), pca = FALSE)
@@ -64,23 +62,43 @@ umap <- umap(t(corrected))
 ggplot(data.frame(tSNE1 = tsne$Y[,1],
                   tSNE2 = tsne$Y[,2],
                   tissue = as.factor(colData(sce)$Tissue))) + 
-  geom_point(aes(tSNE1, tSNE2, colour = tissue))
+  geom_point(aes(tSNE1, tSNE2, colour = tissue), size = 0.5) + 
+  scale_color_brewer(palette = "Set1")
 
 ggplot(data.frame(UMAP1 = umap$layout[,1],
                   UMAP2 = umap$layout[,2],
                   tissue = as.factor(colData(sce)$Tissue))) + 
-  geom_point(aes(UMAP1, UMAP2, colour = tissue))
+  geom_point(aes(UMAP1, UMAP2, colour = tissue), size = 0.5) + 
+  scale_color_brewer(palette = "Set1")
 
 # Patient
 ggplot(data.frame(tSNE1 = tsne$Y[,1],
                   tSNE2 = tsne$Y[,2],
                   patient = as.factor(colData(sce)$Patient))) + 
-  geom_point(aes(tSNE1, tSNE2, colour = patient))
+  geom_point(aes(tSNE1, tSNE2, colour = patient), size = 0.5) + 
+  scale_color_manual(values = c(brewer.pal(8, "Set1"), brewer.pal(8, "Set3")))
 
 ggplot(data.frame(UMAP1 = umap$layout[,1],
                   UMAP2 = umap$layout[,2],
                   patient = as.factor(colData(sce)$Patient))) + 
-  geom_point(aes(UMAP1, UMAP2, colour = patient))
+  geom_point(aes(UMAP1, UMAP2, colour = patient), size = 0.5) + 
+  scale_color_manual(values = c(brewer.pal(8, "Set1"), brewer.pal(8, "Set3")))
+
+# Patient and tissue
+qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  all = as.factor(paste(colData(sce)$Tissue, colData(sce)$Patient)))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = all), size = 0.5) + 
+  scale_color_manual(values = col_vector)
+
+ggplot(data.frame(UMAP1 = umap$layout[,1],
+                  UMAP2 = umap$layout[,2],
+                  all = as.factor(paste(colData(sce)$Tissue, colData(sce)$Patient)))) + 
+  geom_point(aes(UMAP1, UMAP2, colour = all), size = 0.5) + 
+  scale_color_manual(values = col_vector)
   
 table(colData(sce)$Patient, colData(sce)$Tissue)
 ```
