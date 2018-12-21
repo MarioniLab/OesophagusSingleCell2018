@@ -66,11 +66,21 @@ ggplot(data.frame(tSNE1 = tsne$Y[,1],
                   tissue = as.factor(colData(sce)$Tissue))) + 
   geom_point(aes(tSNE1, tSNE2, colour = tissue))
 
+ggplot(data.frame(UMAP1 = umap$layout[,1],
+                  UMAP2 = umap$layout[,2],
+                  tissue = as.factor(colData(sce)$Tissue))) + 
+  geom_point(aes(UMAP1, UMAP2, colour = tissue))
+
 # Patient
 ggplot(data.frame(tSNE1 = tsne$Y[,1],
                   tSNE2 = tsne$Y[,2],
                   patient = as.factor(colData(sce)$Patient))) + 
   geom_point(aes(tSNE1, tSNE2, colour = patient))
+
+ggplot(data.frame(UMAP1 = umap$layout[,1],
+                  UMAP2 = umap$layout[,2],
+                  patient = as.factor(colData(sce)$Patient))) + 
+  geom_point(aes(UMAP1, UMAP2, colour = patient))
   
 table(colData(sce)$Patient, colData(sce)$Tissue)
 ```
