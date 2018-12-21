@@ -1,0 +1,76 @@
+---
+title: "Batch correction across tissues and patients"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/Full_data_batch_correction_allSamples.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script performs batch correction across all samples, even the low quality ones.
+
+# Read in the data
+
+```{r libraries, message=FALSE}
+library(scran)
+library(scater)
+library(DropletUtils)
+library(openxlsx)
+library(Rtsne)
+library(umap)
+source("../Analysis/Functions/auxiliary.R")
+```
+
+# Batch correction across tissues
+
+```{r batch-correction, fig.height=12, fig.width=12}
+sce.list <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
+
+sce.list <- lapply(sce.list, function(n){
+    rowData(n) <- rowData(n)[,1:3]
+    n
+  })
+
+# Order sce objects for batch correction
+n <- names(sce.list)
+sce.list <- sce.list[c(which(grepl("GOJ", n)), which(grepl("SCJ", n)),
+                       which(grepl("NE", n)), which(grepl("GC", n)),
+                       which(grepl("BE", n)), which(grepl("D2", n)),
+                       which(grepl("SMG", n)))]
+
+# Combine sce objects
+sce <- do.call("cbind", sce.list)
+sce <- normalize(sce)
+  
+# Batch correction
+corrected <- batch.correction(sce.list)
+  
+# Save batch corrected counts in metdata
+metadata(sce)$corrected <- corrected
+  
+# Compute tsne on corrected counts
+set.seed(1234)
+tsne <- Rtsne(t(corrected), pca = FALSE)
+umap <- umap(t(corrected))
+
+# Tissue
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  tissue = as.factor(colData(sce)$Tissue))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = tissue))
+
+# Patient
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  patient = as.factor(colData(sce)$Patient))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = patient))
+  
+table(colData(sce)$Patient, colData(sce)$Tissue)
+```
