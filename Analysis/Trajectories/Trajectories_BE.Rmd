@@ -23,15 +23,17 @@ This script performs trajectory analysis on the BE and GC samples
 
 ## Read in batch corrected data
 
-```{r}
-suppressMessages(library(scran))
-suppressMessages(library(Rtsne))
-suppressMessages(library(ggplot2))
-suppressMessages(library(viridis))
-suppressMessages(library(monocle))
-suppressMessages(library(plot3Drgl))
-suppressMessages(library(umap))
-suppressMessages(library(vegan))
+```{r, message=FALSE, warning=FALSE}
+library(scran)
+library(Rtsne)
+library(ggplot2)
+library(viridis)
+library(monocle)
+library(plot3Drgl)
+library(umap)
+library(vegan)
+library(pheatmap)
+library(openxlsx)
 suppressMessages(source("../Functions/auxiliary.R"))
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 
@@ -263,6 +265,76 @@ ggplot(data.frame(UMAP1 = umap.all$layout[,1],
                   UMAP2 = umap.all$layout[,2],
                   NCL = logcounts(sce)[rowData(sce)$Symbol == "NCL",])) +
   geom_point(aes(x = UMAP1, y = UMAP2, colour = NCL)) + scale_colour_viridis()
+```
+
+Cluster 9 and 3 appear to be stem cell like clusters. 
+Here, I will perform differential expression between these and all other clusters.
+
+# Differential expression analysis
+
+```{r}
+pheatmap(t(t(table(sce$Tissue_cluster, sce$Patient))/colSums(table(sce$Tissue_cluster, sce$Patient))),
+         cluster_rows = FALSE, cluster_cols = FALSE)
+
+cur_clusters <- sce$Tissue_cluster 
+cur_clusters[cur_clusters == 9 | cur_clusters == 3] <- "stem"
+
+# Differential expression analysis
+for(i in c(2,5,6,7,8,10,11,12,13)){
+  cur_sce <- sce[,cur_clusters == "stem" | cur_clusters == as.character(i)]
+  cur_sce <- cur_sce[rowMeans(counts(cur_sce)) > 0,]
+  cluster_test <- cur_clusters[cur_clusters == "stem" | cur_clusters == as.character(i)]
+
+  mat <- matrix(data = NA, ncol = length(unique(paste(colData(cur_sce)$Patient, 
+                                        cluster_test, sep = "_"))), 
+                nrow = nrow(counts(cur_sce)))
+  rownames(mat) <- rownames(counts(cur_sce))
+  colnames(mat) <- unique(paste(colData(cur_sce)$Patient, 
+                                cluster_test, sep = "_"))
+  
+  for(j in colnames(mat)){
+    cur_patient <- unlist(strsplit(j, "_"))[1]
+    cur_clust <- unlist(strsplit(j, "_"))[2]
+    mat[,j] <- Matrix::rowSums(counts(cur_sce)[,colData(cur_sce)$Patient == cur_patient &
+                                                  cluster_test == cur_clust]) 
+  }
+  
+  # Perform differential testing
+  y <- DGEList(counts=mat,
+              group=sapply(colnames(mat), 
+                            function(n){unlist(strsplit(n, "_"))[1]}))
+  y <- calcNormFactors(y)
+  design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
+  colnames(design) <- c(paste("Cluster", i, sep = ""), "stem")
+  y <- estimateDisp(y,design)
+  
+  fit <- glmQLFit(y,design, robust = TRUE)
+  qlf <- glmTreat(fit,coef=2, lfc = 0.5, 
+                 contrast = eval(parse(text=paste("makeContrasts(Cluster", i, " - stem, levels = design)", sep = ""))))
+  cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
+
+  # Save markers
+  cur_out <- list()
+  cur_out$Stem <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.1,]
+  cur_out$Stem$Genename <- rowData(cur_sce)$Symbol[match(rownames(cur_out$Stem), rowData(cur_sce)$ID)]
+  cur_out[[paste("Cluster", i, sep = "")]] <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.1,]
+  cur_out[[paste("Cluster", i, sep = "")]]$Genename <- rowData(cur_sce)$Symbol[match(rownames(cur_out[[paste("Cluster", i, sep = "")]]), rowData(cur_sce)$ID)]
+
+  # Save output
+  write.xlsx(cur_out, paste("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Marker_genes/DE/Barrets_clusters/Cluster", i, 
+                            "_vs_StemCells.xlsx", sep = ""))
+}
+
+# Visualize some genes
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  gene = logcounts(sce)[rowData(sce)$Symbol == "PDZD3",])) +
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = gene)) + scale_colour_viridis()
+
+ggplot(data.frame(UMAP1 = umap.all$layout[,1],
+                  UMAP2 = umap.all$layout[,2],
+                  gene = logcounts(sce)[rowData(sce)$Symbol == "BIRC5",])) +
+  geom_point(aes(x = UMAP1, y = UMAP2, colour = gene)) + scale_colour_viridis()
 ```
 
 # Monocle
