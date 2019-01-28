@@ -1,0 +1,45 @@
+---
+title: "Cluster annotation"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/Annotation.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script connects the cluster labels received from unsupervised, tissue-level clustering and links them to known cell types.
+
+# Read in the data
+
+```{r libraries, message=FALSE}
+library(scran)
+library(scater)
+library(openxlsx)
+source("../Analysis/Functions/auxiliary.R")
+sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+```
+
+# Annotation
+
+Cell-type annotation needs to be done by hand.
+We therefore create a .xlsx file that stores the cluster IDs and annotation.
+
+```{r}
+annot <- unique(paste(sce$Tissue, sce$Tissue_cluster, sep = "_"))
+df.annot <- data.frame(tissue = sub("_[0-9]*$", "", annot),
+                       cluster = sub("^[A-Z2]*_", "", annot), stringsAsFactors = FALSE)
+df.annot <- df.annot[order(df.annot[,1], as.integer(df.annot[,2])),]
+df.annot$cell_type <- vector(length = nrow(df.annot))
+df.annot$include <- vector(length = nrow(df.annot))
+
+write.xlsx(df.annot, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/Cell_type_annotation.xlsx")
+```
+
+
