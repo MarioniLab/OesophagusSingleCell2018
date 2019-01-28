@@ -1,0 +1,96 @@
+---
+title: "Figure S1: Computational processing of all data"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/Full_data_batch_correction.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script visualizes the filtered data obtained after running the Quality_control, Normalization and Further_processing scripts. 
+We will first plot these cells to highlight the patient effect and afterwards perform batch-correction.
+Finally, we will mark the high-quality batches and cells.
+
+# Read in the data
+
+```{r libraries, message=FALSE}
+library(scran)
+library(scater)
+library(DropletUtils)
+library(openxlsx)
+library(umap)
+source("../../Analysis/Functions/auxiliary.R")
+```
+
+# Dimensionality reduction
+
+We will first visualize the uncorrected data.
+
+```{r}
+# Read in all datafiles
+sce.list <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
+sce.list <- sce.list[!(names(sce.list) %in% c("Patient6_SIGAH9_DT1", "Patient6_SIGAG9_GD3",
+                                              "Patient4_SIGAG4_SMG"))]
+
+# Remove all unecessary rowData prior to merging
+sce.list <- lapply(sce.list, function(n){
+    rowData(n) <- rowData(n)[,1:3]
+    n
+  })
+
+# Merge datasets
+sce.all <- do.call("cbind", sce.list)
+sce.all <- normalize(sce.all)
+
+# Compute the top 1000 shared highly variable genes
+HVG.genes <- lapply(sce.list, function(n){
+    HVG <- trendVar(n, use.spikes = FALSE)
+    decomposeVar(n, HVG)
+  })
+HVG.df <- do.call("combineVar", HVG.genes)
+HVG.df <- HVG.df[order(HVG.df$bio, decreasing = TRUE),]
+HVgenes <- rownames(HVG.df)[1:1000]
+
+# Compute tsne
+set.seed(123456)
+tsne <- Rtsne(t(as.matrix(logcounts(sce.all)[HVgenes,])), perplexity = 100)
+
+# Create annotation and colour vector
+annot <- paste(colData(sce.all)$Tissue, colData(sce.all)$Patient, sep = "_")
+annot.col <- vector(length = length(unique(annot)))
+names(annot.col) <- unique(annot)
+annot.col[grepl("NE", names(annot.col))] <- colorRampPalette(c("white", "red"))(21)[c(5,7,9,11,13,15,17,19,21)]
+annot.col[grepl("GOJ", names(annot.col))] <- colorRampPalette(c("white", "orange"))(21)[c(9,11,13,15,17,19,21)]
+annot.col[grepl("SCJ", names(annot.col))] <- colorRampPalette(c("white", "brown"))(17)[c(13,15,17)]
+annot.col[grepl("BE", names(annot.col))] <- colorRampPalette(c("white", "dark green"))(17)[c(5,9,13,17)]
+annot.col[grepl("D2", names(annot.col))] <- colorRampPalette(c("white", "purple"))(17)[c(5,9,13,17)]
+annot.col[grepl("GC", names(annot.col))] <- colorRampPalette(c("white", "dark blue"))(25)[c(5,7,9,11,13,15,17,19,21,23,25)]
+annot.col[grepl("SMG", names(annot.col))] <- colorRampPalette(c("white", "coral"))(17)[c(5,9,13,17)]
+
+# Plot tsne
+tsne.uncorrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], Sample = annot)) + 
+  geom_point(aes(tsne1, tsne2, colour = Sample)) + scale_colour_manual(values = annot.col) + theme_minimal()
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S1/All_data_uncorrected.pdf", tsne.uncorrected, width = 12, height = 7)
+```
+
+# Batch correction across tissues
+
+We will now perform batch correction across all samples/
+
+```{r}
+
+
+# Order sce objects for batch correction
+n <- names(sce.list)
+sce.list <- sce.list[c(which(grepl("GOJ", n)), which(grepl("SCJ", n)),
+                       which(grepl("NE", n)), which(grepl("GC", n)),
+                       which(grepl("BE", n)), which(grepl("D2", n)),
+                       which(grepl("SMG", n)))]
+```
