@@ -25,7 +25,7 @@ library(scran)
 library(scater)
 library(DropletUtils)
 library(openxlsx)
-library(umap)
+library(Rtsne)
 source("../../Analysis/Functions/auxiliary.R")
 ```
 
@@ -77,20 +77,39 @@ annot.col[grepl("SMG", names(annot.col))] <- colorRampPalette(c("white", "coral"
 # Plot tsne
 tsne.uncorrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], Sample = annot)) + 
   geom_point(aes(tsne1, tsne2, colour = Sample)) + scale_colour_manual(values = annot.col) + theme_minimal()
+
 ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S1/All_data_uncorrected.pdf", tsne.uncorrected, width = 12, height = 7)
 ```
 
 # Batch correction across tissues
 
-We will now perform batch correction across all samples/
+We will now perform batch correction across all samples. 
+For this, we will use the samples that contain a mix of different tissues first.
 
 ```{r}
-
-
 # Order sce objects for batch correction
 n <- names(sce.list)
 sce.list <- sce.list[c(which(grepl("GOJ", n)), which(grepl("SCJ", n)),
                        which(grepl("NE", n)), which(grepl("GC", n)),
                        which(grepl("BE", n)), which(grepl("D2", n)),
                        which(grepl("SMG", n)))]
+
+# Combine sce objects
+sce.all <- do.call("cbind", sce.list)
+sce.all <- normalize(sce.all)
+  
+# Batch correction
+corrected <- batch.correction(sce.list)
+  
+# Compute tsne on corrected counts
+set.seed(123)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+
+# Visualize batches
+annot <- paste(colData(sce.all)$Tissue, colData(sce.all)$Patient, sep = "_")
+
+tsne.corrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], Sample = annot)) + 
+  geom_point(aes(tsne1, tsne2, colour = Sample)) + scale_colour_manual(values = annot.col) + theme_minimal()
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S1/All_data_corrected.pdf", tsne.corrected, width = 12, height = 7)
 ```
