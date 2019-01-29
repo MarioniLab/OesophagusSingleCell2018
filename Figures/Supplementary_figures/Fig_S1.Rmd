@@ -36,6 +36,8 @@ We will first visualize the uncorrected data.
 ```{r}
 # Read in all datafiles
 sce.list <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
+
+# Here we exclude the samples that were just used as test runs
 sce.list <- sce.list[!(names(sce.list) %in% c("Patient6_SIGAH9_DT1", "Patient6_SIGAG9_GD3",
                                               "Patient4_SIGAG4_SMG"))]
 
@@ -112,4 +114,35 @@ tsne.corrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], Samp
   geom_point(aes(tsne1, tsne2, colour = Sample)) + scale_colour_manual(values = annot.col) + theme_minimal()
 
 ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S1/All_data_corrected.pdf", tsne.corrected, width = 12, height = 7)
+```
+
+# High quality samples
+
+In the next step, we will highlight the high quality samples. 
+The exclusion criteria is explained in Suppementary Note 1.
+
+```{r}
+# Read in the data of high quality samples
+sce.high.quality <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/High_quality_sce.rds")
+annot.high.quality <- sapply(names(sce.high.quality), function(n){paste(unlist(strsplit(n, "_"))[c(3,1)], collapse = "_")})
+
+# Grey out the cells that we are not using
+annot.col.high.quality <- annot.col
+annot.col.high.quality[!(names(annot.col.high.quality) %in% annot.high.quality)] <- "black"
+
+# Dataframe for visualization
+df <- data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], 
+                 Sample = annot,
+                 include = paste(sce.all$Tissue, sce.all$Patient, sep = "_") %in%
+                   annot.high.quality)
+
+tsne.corrected.high.quality <- ggplot() + 
+  geom_point(data = df[df$include,],
+             aes(tsne1, tsne2, colour = Sample)) +
+  geom_point(data = df[!df$include,],
+             aes(tsne1, tsne2, colour = Sample), shape = 1, alpha = 0.5) +
+  scale_colour_manual(values = annot.col.high.quality) + 
+  theme_minimal()
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S1/All_data_corrected_highQuality.pdf", tsne.corrected.high.quality, width = 12, height = 7)
 ```
