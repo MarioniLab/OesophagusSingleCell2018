@@ -46,7 +46,7 @@ write.xlsx(df.annot, "../../../Dropbox (Cambridge University)/Oesophagus_single_
 After cluster annotation, we will save this in the colData slot of the SCE object.
 
 ```{r}
-annot <- read.xlsx("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/Cell_type_annotation_toEdit.xlsx")
+annot <- read.xlsx("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/Cell_type_annotation_v2.xlsx")
 
 # Link the tissue/cluster annotation of the single cell data to the annotation dataframe
 m <- match(paste(sce$Tissue, sce$Tissue_cluster, sep = "_"), 
@@ -65,7 +65,7 @@ colour_vector <- vector(length = length(unique(sce$Tissue)))
 names(colour_vector) <- unique(sce$Tissue)
 colour_vector["GC"] <- "#4DBBD5FF"
 colour_vector["SCJ"] <- "#DC0000FF"
-colour_vector["NE"] <- "#E64B35FF"
+colour_vector["NE"] <- "dark red"
 colour_vector["GOJ"] <- "#F39B7FFF"
 colour_vector["BE"] <- "#00A087FF"
 colour_vector["D2"] <- "#3C5488FF"
