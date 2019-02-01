@@ -1,5 +1,5 @@
 ---
-title: "Cluster annotation"
+title: "Cluster annotation and colouring"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -22,6 +22,7 @@ This script connects the cluster labels received from unsupervised, tissue-level
 library(scran)
 library(scater)
 library(openxlsx)
+library(Rtsne)
 source("../Analysis/Functions/auxiliary.R")
 sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
@@ -40,6 +41,52 @@ df.annot$cell_type <- vector(length = nrow(df.annot))
 df.annot$include <- vector(length = nrow(df.annot))
 
 write.xlsx(df.annot, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/Cell_type_annotation.xlsx")
+```
+
+After cluster annotation, we will save this in the colData slot of the SCE object.
+
+```{r}
+annot <- read.xlsx("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/Cell_type_annotation_toEdit.xlsx")
+
+# Link the tissue/cluster annotation of the single cell data to the annotation dataframe
+m <- match(paste(sce$Tissue, sce$Tissue_cluster, sep = "_"), 
+           paste(annot$tissue, annot$cluster, sep = "_"))
+sce$cell_type <- annot$cell_type[m]
+sce$include <- annot$include[m]
+sce$confidence <- annot$Confidence[m]
+```
+
+# Create colour vector for tissue samples
+
+To allow consistent colouring of the tissues, we will store a colour vector in the metadata file.
+
+```{r}
+colour_vector <- vector(length = length(unique(sce$Tissue)))
+names(colour_vector) <- unique(sce$Tissue)
+colour_vector["GC"] <- "#4DBBD5FF"
+colour_vector["SCJ"] <- "#DC0000FF"
+colour_vector["NE"] <- "#E64B35FF"
+colour_vector["GOJ"] <- "#F39B7FFF"
+colour_vector["BE"] <- "#00A087FF"
+colour_vector["D2"] <- "#3C5488FF"
+colour_vector["SMG"] <- "#B09C85FF"
+
+# Recompute tsne for visualization
+set.seed(333)
+tsne <- Rtsne(t(metadata(sce)$corrected), pca = FALSE, perplexity = 100)
+  
+# Store tsne in slot
+reducedDims(sce)$TSNE <- tsne$Y[,1:2]
+
+ggplot(data.frame(tsne1 = reducedDims(sce)$TSNE[,1],
+                  tsne2 = reducedDims(sce)$TSNE[,2],
+                  tissue = sce$Tissue)) + 
+  geom_point(aes(tsne1, tsne2, colour = tissue)) + 
+  scale_colour_manual(values = colour_vector)
+
+metadata(sce)$colour_vector <- colour_vector
+
+saveRDS(sce, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
 

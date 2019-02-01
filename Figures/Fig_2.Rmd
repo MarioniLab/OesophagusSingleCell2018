@@ -1,0 +1,55 @@
+---
+title: "Figure 2: Similarity analysis between BE and other tissues"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_2.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script focuses on the similarity analysis between BE and other tissues: GC, SMG and D2.
+
+# Read in the data
+
+```{r libraries, message=FALSE}
+library(scran)
+library(scater)
+library(DropletUtils)
+library(openxlsx)
+library(Rtsne)
+source("../../Analysis/Functions/auxiliary.R")
+sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+```
+
+# Plot circular dendrogram of all clusters
+
+To estimate the similarity between all cell types, we compute an averaged expression profile for each cell-type and perform hierarchical cluster analysis.
+
+```{r}
+# We will perform this analysis on the corrected and uncorrected counts
+clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
+mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(metadata(sce)$corrected))
+colnames(mat) <- unique(clusters)
+
+for(i in unique(clusters)){
+  mat[,i] <- rowMeans(metadata(sce)$corrected[,clusters == i])
+}
+
+# Rename the matrix to contain the actual cell-type labels
+for(i in 1:ncol(mat)){
+  colnames(mat)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
+                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
+}
+
+dend <- hclust(as.dist(sqrt(1 - cor(mat, method = "pearson"))/2), method = "ward.D2")
+plot(as.phylo(dend), type = "fan", tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+
+```
+
