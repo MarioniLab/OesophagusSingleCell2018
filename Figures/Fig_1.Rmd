@@ -1,0 +1,54 @@
+---
+title: "Figure 1: overview on experimental approach and gland cells"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_1.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script visualizes the full dataset as well as highlighting the sub-populations in the gland cells.
+
+# Read in the data
+
+```{r libraries, message=FALSE}
+library(scran)
+library(scater)
+library(DropletUtils)
+library(openxlsx)
+library(Rtsne)
+source("../Analysis/Functions/auxiliary.R")
+
+# Read in the normalized and batch-corrected reads
+sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+```
+
+
+# Plot tSNE of all cells
+
+Here, we plot the tSNE after batch correction and after removing contaminating cell populations.
+The filtering steps are explained in detail in the Methods and Supplementary Note 1.
+
+```{r}
+p.all.cells <- ggplot(data.frame(tsne1 = reducedDims(sce)$TSNE[colData(sce)$include,1],
+                  tsne2 = reducedDims(sce)$TSNE[colData(sce)$include,2],
+                  tissue = colData(sce)$Tissue[colData(sce)$include])) + 
+  geom_point(aes(tsne1, tsne2, colour = tissue)) + 
+  scale_color_manual(values = metadata(sce)$colour_vector) + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "grey"))
+
+ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_1/All_cells.pdf", 
+       p.all.cells, 
+       width = 8, height = 7)
+```
+
