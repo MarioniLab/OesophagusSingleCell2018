@@ -37,9 +37,13 @@ Here, we plot the tSNE after batch correction and after removing contaminating c
 The filtering steps are explained in detail in the Methods and Supplementary Note 1.
 
 ```{r}
-p.all.cells <- ggplot(data.frame(tsne1 = reducedDims(sce)$TSNE[colData(sce)$include,1],
-                  tsne2 = reducedDims(sce)$TSNE[colData(sce)$include,2],
-                  tissue = colData(sce)$Tissue[colData(sce)$include])) + 
+# Remove contaminating cells but leave SMG cells in
+include <- colData(sce)$include
+include[colData(sce)$Tissue == "SMG"] <- TRUE
+
+p.all.cells <- ggplot(data.frame(tsne1 = reducedDims(sce)$TSNE[include,1],
+                  tsne2 = reducedDims(sce)$TSNE[include,2],
+                  tissue = colData(sce)$Tissue[include])) + 
   geom_point(aes(tsne1, tsne2, colour = tissue)) + 
   scale_color_manual(values = metadata(sce)$colour_vector) + 
   theme(panel.grid.major = element_blank(), 
