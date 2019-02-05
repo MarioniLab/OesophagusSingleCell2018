@@ -1,5 +1,5 @@
 ---
-title: "Figure S1: Computational processing of all data"
+title: "Figure S2: Computational processing of all data"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 2
 knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/Full_data_batch_correction.html') })
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S2.html') })
 ---
 
 ```{r setup, include=FALSE}
