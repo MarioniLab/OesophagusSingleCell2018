@@ -152,23 +152,26 @@ owen_vector["Brain"] <- "black"
 colour_vector <- c(metadata(sce)$colour_vector, 
                    owen_vector)
 
+# Number of cells in owen dataset
+n.owen <- sum(unlist(lapply(owen.list, ncol)))
+
 owen.all.tissues <- ggplot() +
     geom_point(data = data.frame(
-    tsne1 = tsne$Y[1:(ncol(corrected)-ncol(sce.owen)),1],
-    tsne2 = tsne$Y[1:(ncol(corrected)-ncol(sce.owen)),2],
-    tissue = tissues.all[1:(ncol(corrected)-ncol(sce.owen))]
+    tsne1 = tsne$Y[1:(ncol(corrected)-n.owen),1],
+    tsne2 = tsne$Y[1:(ncol(corrected)-n.owen),2],
+    tissue = tissues.all[1:(ncol(corrected)-n.owen)]
     ), 
     aes(tsne1, tsne2, colour = tissue), size = 1) +
     geom_point(data = data.frame(
-    tsne1 = tsne$Y[(ncol(corrected)-ncol(sce.owen)+1):ncol(corrected),1],
-    tsne2 = tsne$Y[(ncol(corrected)-ncol(sce.owen)+1):ncol(corrected),2],
-    tissue = tissues.all[(ncol(corrected)-ncol(sce.owen)+1):ncol(corrected)]
+    tsne1 = tsne$Y[(ncol(corrected)-n.owen+1):ncol(corrected),1],
+    tsne2 = tsne$Y[(ncol(corrected)-n.owen+1):ncol(corrected),2],
+    tissue = tissues.all[(ncol(corrected)-n.owen+1):ncol(corrected)]
     ), 
     aes(tsne1, tsne2), size = 2, colour = "black") +
   geom_point(data = data.frame(
-    tsne1 = tsne$Y[(ncol(corrected)-ncol(sce.owen)+1):ncol(corrected),1],
-    tsne2 = tsne$Y[(ncol(corrected)-ncol(sce.owen)+1):ncol(corrected),2],
-    tissue = tissues.all[(ncol(corrected)-ncol(sce.owen)+1):ncol(corrected)]
+    tsne1 = tsne$Y[(ncol(corrected)-n.owen+1):ncol(corrected),1],
+    tsne2 = tsne$Y[(ncol(corrected)-n.owen+1):ncol(corrected),2],
+    tissue = tissues.all[(ncol(corrected)-n.owen+1):ncol(corrected)]
     ), 
     aes(tsne1, tsne2, colour = tissue), size = 1) + 
   scale_color_manual(values = colour_vector) +
@@ -182,9 +185,9 @@ tissue.gland <- c(rep(NA, length(tissues)),
                   as.character(unlist(lapply(owen.list, function(n){n$gland_cells_k3}))))
 gland.groups.tissues <- ggplot() +
   geom_point(data = data.frame(
-    tsne1 = tsne$Y[1:(ncol(corrected)-ncol(sce.owen)),1],
-    tsne2 = tsne$Y[1:(ncol(corrected)-ncol(sce.owen)),2],
-    tissue = tissues.all[1:(ncol(corrected)-ncol(sce.owen))]
+    tsne1 = tsne$Y[1:(ncol(corrected)-n.owen),1],
+    tsne2 = tsne$Y[1:(ncol(corrected)-n.owen),2],
+    tissue = tissues.all[1:(ncol(corrected)-n.owen)]
     ), 
     aes(tsne1, tsne2, colour = tissue), size = 1) +
   geom_point(data = data.frame(
