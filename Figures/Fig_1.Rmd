@@ -76,6 +76,7 @@ cur_sce <- do.call("cbind", sce.list)
 cur_sce <- normalize(cur_sce)
 
 # Compute tSNE for gland cells
+set.seed(111)
 smg_tsne <- Rtsne(t(corrected), pca = FALSE)
 
 # Create colour vecotr for glands
@@ -88,8 +89,8 @@ colour_vector["Endothelial"] <- "grey60"
 colour_vector["Nonepithelial"] <- "grey80"
 colour_vector["Duct_intercalating"] <- "burlywood4"
 colour_vector["Squamous_Esophagus"] <- "black"
-colour_vector["Myo-epithelial"] <- "grey20"
-colour_vector["Dendritic"] <- "grey"
+colour_vector["Myo-epithelial"] <- "brown"
+colour_vector["Dendritic"] <- "grey20"
 
 p.smg <- ggplot(data.frame(tsne1 = smg_tsne$Y[,1],
                   tsne2 = smg_tsne$Y[,2],
