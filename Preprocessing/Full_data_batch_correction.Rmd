@@ -36,10 +36,10 @@ sce.list <- lapply(sce.list, function(n){
   })
 
 # Order sce objects for batch correction
-order.names <- c("Patient2_SIGAD9_GOJ", "Patient8_SIGAE7_GOJ", "Patient10_SIGAB5_GOJ",
-                 "Patient3_SIGAB5_SCJ", "Patient7_SIGAB4_SCJ", "Patient9_SIGAE9_SCJ",
-                 "Patient10_SIGAA5_NE", "Patient2_SIGAC9_NE", "Patient7_SIGAA4_NE",
-                 "Patient8_SIGAD7_NE", "Patient2_SIGAE9_GC", "Patient3_SIGAD5_GC",
+order.names <- c("Patient10_SIGAA5_NE", "Patient2_SIGAC9_NE", "Patient7_SIGAA4_NE",
+                 "Patient8_SIGAD7_NE","Patient2_SIGAD9_GOJ", "Patient8_SIGAE7_GOJ", 
+                 "Patient10_SIGAB5_GOJ", "Patient3_SIGAB5_SCJ", "Patient7_SIGAB4_SCJ", 
+                 "Patient9_SIGAE9_SCJ", "Patient2_SIGAE9_GC", "Patient3_SIGAD5_GC",
                  "Patient7_SIGAD4_GC", "Patient3_SIGAC5_BE",
                  "Patient7_SIGAC4_BE", "Patient9_SIGAF9_BE",
                  "Patient7_SIGAE4_D2", "Patient8_SIGAG7_D2", "Patient9_SIGAH9_D2",
