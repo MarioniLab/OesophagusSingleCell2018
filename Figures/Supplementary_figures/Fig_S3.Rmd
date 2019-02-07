@@ -212,3 +212,95 @@ ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Result
 ```
 
 # Comparison to HCA data
+
+We next compare our data to normal oesophagus samples from different patients.
+This data has been generated in the context of the Human Cell Atlas.
+Here, we want to check whether gland cells can be detected by simply sampling thousands of cells from normal oesophagus.
+
+We remove one patient due to differences in the dissociation protocol.
+
+```{r}
+# Read in the HCA data
+HCA.sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Teichman_data/Data/Teichmann_data_small.rds")
+
+# Remove donor 296C
+HCA.sce <- HCA.sce[,HCA.sce$Donor != "296C"]
+
+# Normalization
+cluster <- quickCluster(HCA.sce, method = "igraph", irlba.args = c("work" = 100), 
+                         max.size = 2000, min.size = 50)
+HCA.sce <- computeSumFactors(HCA.sce, clusters=cluster)
+HCA.sce <- normalize(HCA.sce, return_log = TRUE)
+
+# For our data, we select the normal oesophagus an gland cells
+sce <- sce[,sce$Tissue == "NE" | sce$Tissue == "SMG"]
+sce <- normalize(sce)
+
+# Select the same set of genes for both datasets
+genes <- intersect(rownames(HCA.sce), rowData(sce)$Symbol)
+HCA.sce <- HCA.sce[genes,]
+sce <- sce[match(genes, rowData(sce)$Symbol),]
+rownames(sce) <- genes
+
+# Split the data into individual batches
+sce.list <- split.sce(sce, groups = unique(sce$Sample), colData.name = "Sample")
+
+# Add the Teichmann data to this list
+sce.list <- c(sce.list, split.sce(HCA.sce, unique(HCA.sce$Donor), colData.name = "Donor"))
+
+# Batch correction and merging
+corrected <- batch.correction(sce.list)
+sce <- do.call("cbind", split.sce(sce, groups = unique(sce$Sample), colData.name = "Sample"))
+HCA.sce <- do.call("cbind", split.sce(HCA.sce, groups = unique(HCA.sce$Donor), colData.name = "Donor"))
+
+# Generate tissue vector - we colour the gland cells based on their cell type
+tissues.all <- c(sce$Tissue, rep("NE", ncol(HCA.sce)))
+tissues.all[tissues.all == "SMG"] <- sce$cell_type[sce$Tissue == "SMG"]
+
+# Generate new colour vector
+colour_vector <- vector(length = length(unique(tissues.all)))
+names(colour_vector) <- unique(tissues.all)
+colour_vector["Fibroblast"] <- "grey40"
+colour_vector["Mucous"] <- "saddlebrown"
+colour_vector["Serous"] <- "burlywood3"
+colour_vector["Endothelial"] <- "grey60"
+colour_vector["Nonepithelial"] <- "grey80"
+colour_vector["Duct_intercalating"] <- "burlywood4"
+colour_vector["Squamous_Esophagus"] <- "black"
+colour_vector["Myo-epithelial"] <- "brown"
+colour_vector["Dendritic"] <- "grey20"
+colour_vector["NE"] <- "dark red"
+
+# Visualization of mapped data
+set.seed(12345)
+tsne <- Rtsne(t(corrected), perplexity = 100, pca = FALSE)
+
+# Visualization
+HCA.all.cells <- ggplot() +
+    geom_point(data = data.frame(
+    tsne1 = tsne$Y[1:(ncol(corrected)-ncol(HCA.sce)),1],
+    tsne2 = tsne$Y[1:(ncol(corrected)-ncol(HCA.sce)),2],
+    tissue = tissues.all[1:(ncol(corrected)-ncol(HCA.sce))]
+    ), 
+    aes(tsne1, tsne2, colour = tissue), size = 1) +
+    geom_point(data = data.frame(
+    tsne1 = tsne$Y[(ncol(corrected)-ncol(HCA.sce)+1):ncol(corrected),1],
+    tsne2 = tsne$Y[(ncol(corrected)-ncol(HCA.sce)+1):ncol(corrected),2],
+    tissue = tissues.all[(ncol(corrected)-ncol(HCA.sce)+1):ncol(corrected)]
+    ), 
+    aes(tsne1, tsne2), size = 2, colour = "black") +
+  geom_point(data = data.frame(
+    tsne1 = tsne$Y[(ncol(corrected)-ncol(HCA.sce)+1):ncol(corrected),1],
+    tsne2 = tsne$Y[(ncol(corrected)-ncol(HCA.sce)+1):ncol(corrected),2],
+    tissue = tissues.all[(ncol(corrected)-ncol(HCA.sce)+1):ncol(corrected)]
+    ), 
+    aes(tsne1, tsne2, colour = tissue), size = 1) + 
+  scale_color_manual(values = colour_vector) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "grey"))
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S3/HCA_data.pdf", HCA.all.cells, width = 10, height = 8)
+```
+
