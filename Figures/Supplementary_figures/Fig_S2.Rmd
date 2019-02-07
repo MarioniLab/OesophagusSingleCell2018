@@ -68,19 +68,19 @@ tsne <- Rtsne(t(as.matrix(logcounts(sce.all)[HVgenes,])), perplexity = 100)
 annot <- paste(colData(sce.all)$Tissue, colData(sce.all)$Patient, sep = "_")
 annot.col <- vector(length = length(unique(annot)))
 names(annot.col) <- unique(annot)
-annot.col[grepl("NE", names(annot.col))] <- colorRampPalette(c("white", "red"))(21)[c(5,7,9,11,13,15,17,19,21)]
-annot.col[grepl("GOJ", names(annot.col))] <- colorRampPalette(c("white", "orange"))(21)[c(9,11,13,15,17,19,21)]
-annot.col[grepl("SCJ", names(annot.col))] <- colorRampPalette(c("white", "brown"))(17)[c(13,15,17)]
-annot.col[grepl("BE", names(annot.col))] <- colorRampPalette(c("white", "dark green"))(17)[c(5,9,13,17)]
-annot.col[grepl("D2", names(annot.col))] <- colorRampPalette(c("white", "purple"))(17)[c(5,9,13,17)]
-annot.col[grepl("GC", names(annot.col))] <- colorRampPalette(c("white", "dark blue"))(25)[c(5,7,9,11,13,15,17,19,21,23,25)]
-annot.col[grepl("SMG", names(annot.col))] <- colorRampPalette(c("white", "coral"))(17)[c(5,9,13,17)]
+annot.col[grepl("NE", names(annot.col))] <- colorRampPalette(c("white", "dark red"))(21)[c(5,7,9,11,13,15,17,19,21)]
+annot.col[grepl("GOJ", names(annot.col))] <- colorRampPalette(c("white", "#F39B7FFF"))(21)[c(9,11,13,15,17,19,21)]
+annot.col[grepl("SCJ", names(annot.col))] <- colorRampPalette(c("white", "#DC0000FF"))(17)[c(13,15,17)]
+annot.col[grepl("BE", names(annot.col))] <- colorRampPalette(c("white", "#00A087FF"))(17)[c(5,9,13,17)]
+annot.col[grepl("D2", names(annot.col))] <- colorRampPalette(c("white", "#3C5488FF"))(17)[c(5,9,13,17)]
+annot.col[grepl("GC", names(annot.col))] <- colorRampPalette(c("white", "#4DBBD5FF"))(25)[c(5,7,9,11,13,15,17,19,21,23,25)]
+annot.col[grepl("SMG", names(annot.col))] <- colorRampPalette(c("white", "#B09C85FF"))(17)[c(5,9,13)]
 
 # Plot tsne
 tsne.uncorrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], Sample = annot)) + 
   geom_point(aes(tsne1, tsne2, colour = Sample)) + scale_colour_manual(values = annot.col) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S1/All_data_uncorrected.pdf", tsne.uncorrected, width = 12, height = 7)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_uncorrected.pdf", tsne.uncorrected, width = 12, height = 7)
 ```
 
 # Batch correction across tissues
@@ -91,8 +91,8 @@ For this, we will use the samples that contain a mix of different tissues first.
 ```{r}
 # Order sce objects for batch correction
 n <- names(sce.list)
-sce.list <- sce.list[c(which(grepl("GOJ", n)), which(grepl("SCJ", n)),
-                       which(grepl("NE", n)), which(grepl("GC", n)),
+sce.list <- sce.list[c(which(grepl("NE", n)), which(grepl("GOJ", n)),
+                       which(grepl("SCJ", n)), which(grepl("GC", n)),
                        which(grepl("BE", n)), which(grepl("D2", n)),
                        which(grepl("SMG", n)))]
 
@@ -105,15 +105,16 @@ corrected <- batch.correction(sce.list)
   
 # Compute tsne on corrected counts
 set.seed(123)
-tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 150)
 
 # Visualize batches
 annot <- paste(colData(sce.all)$Tissue, colData(sce.all)$Patient, sep = "_")
 
-tsne.corrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], Sample = annot)) + 
+tsne.corrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], 
+                        Sample = annot)) + 
   geom_point(aes(tsne1, tsne2, colour = Sample)) + scale_colour_manual(values = annot.col) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S1/All_data_corrected.pdf", tsne.corrected, width = 12, height = 7)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_corrected.pdf", tsne.corrected, width = 12, height = 7)
 ```
 
 # High quality samples
@@ -144,5 +145,37 @@ tsne.corrected.high.quality <- ggplot() +
   scale_colour_manual(values = annot.col.high.quality) + 
   theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S1/All_data_corrected_highQuality.pdf", tsne.corrected.high.quality, width = 12, height = 7)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_corrected_highQuality.pdf", tsne.corrected.high.quality, width = 12, height = 7)
+```
+
+# View clusters that were removed due to possible contaminations
+
+In the final step, we remove groups of cells that present contaminations when sampling the tissues.
+For example these are squamous oesophagus cells found in the gastric sample.
+
+```{r}
+sce.final <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+
+# Create new colour vector
+annot <- paste(sce.all$Tissue, sce.all$Patient, sep = "_")
+annot[!(annot %in% annot.high.quality)] <- "exclude"
+annot[match(paste(sce.final$Sample[!sce.final$include], sce.final$Barcode[!sce.final$include], sep = "_"), paste(sce.all$Sample, sce.all$Barcode, sep = "_"))] <- "exclude"
+
+# Grey out the cells that we are not using
+annot.col.high.quality <- c(annot.col, "black")
+names(annot.col.high.quality)[length(annot.col.high.quality)] <- "exclude"
+
+# Dataframe for visualization
+df <- data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], 
+                 Sample = annot)
+
+tsne.corrected.final <- ggplot() + 
+  geom_point(data = df[df$Sample == "exclude",],
+             aes(tsne1, tsne2, colour = Sample)) +
+  geom_point(data = df[df$Sample != "exclude",],
+             aes(tsne1, tsne2, colour = Sample)) +
+  scale_colour_manual(values = annot.col.high.quality) + 
+  theme_minimal()
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_corrected_final.pdf", tsne.corrected.final, width = 12, height = 7)
 ```
