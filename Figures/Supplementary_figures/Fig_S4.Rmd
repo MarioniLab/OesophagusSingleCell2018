@@ -25,6 +25,8 @@ library(scater)
 library(DropletUtils)
 library(openxlsx)
 library(Rtsne)
+library(pheatmap)
+library(viridis)
 source("../../Analysis/Functions/auxiliary.R")
 
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
@@ -75,6 +77,33 @@ ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Result
 We next order cells along their spatial postion in the tissue and visualize known marker genes along this trajectory.
 
 ```{r}
+# Removed "unknown" due to possible doublets
+corrected <- corrected[,cur_sce$cell_type != "Unknown"]
+cur_sce <- cur_sce[,cur_sce$cell_type != "Unknown"]
 
+# Calculate pseudorank on corrected counts
+cur_rd <- t(corrected[1:10,])
+rownames(cur_rd) <- paste(cur_sce$Tissue, cur_sce$Patient, cur_sce$Barcode, sep = "_")
+colnames(cur_rd) <- paste("PC", 1:10)
+clusters <- cur_sce$cell_type
+names(clusters) <- rownames(cur_rd)
+PR <- PT(rd = cur_rd, clusters = cur_sce$cell_type, 
+         col_vector = colour_vector)
+
+# Visualize marker genes in heatmap
+genes <- c("KRT4", "KRT5")
+for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),
+                                  order(PR[,"rank"], decreasing = TRUE)]
+colnames(for.heatmap) <- rownames(cur_rd)[order(PR[,"rank"], decreasing = TRUE)]
+
+pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/NE_heatmap.pdf",
+    width = 10, height = 2)
+pheatmap(for.heatmap, cluster_cols = FALSE, cluster_rows = FALSE, labels_row = genes,
+         color = viridis(100), annotation_col = 
+           data.frame(row.names = colnames(for.heatmap),
+                      cell_type = cur_sce$cell_type[order(PR[,"rank"], decreasing = TRUE)]),
+         annotation_colors = list(cell_type = colour_vector), 
+         show_colnames = FALSE) 
+dev.off()
 ```
 
