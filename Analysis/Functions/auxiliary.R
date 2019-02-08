@@ -128,6 +128,48 @@ diffusionPT <- function(sce, HVG, clusters, col_vector,
   }
 }
 
+#### Compute pseudorank
+PT <- function(rd, clusters, col_vector, 
+               exclude = NULL, start = NULL, end = NULL){
+  if(!is.null(exclude)){
+    cur_rd <- rd[!exclude,]
+    
+    cur_lin <- principal_curve(cur_rd)
+    
+    plot(cur_rd, col = col_vector[clusters[!exclude]], 
+         pch = 16, type = "p")
+    lines(cur_lin, lwd = 3)
+    
+    mat.out <- matrix(data = NA, ncol = ncol(cur_rd) + 1, nrow = length(clusters))
+    rownames(mat.out) <- names(clusters)
+    colnames(mat.out) <- c(colnames(cur_rd), "rank")
+    
+    mat.out[!exclude,1:ncol(cur_rd)] <- cur_lin$s
+    mat.out[!exclude,"rank"] <- order(cur_lin$tag)
+    
+    mat.out
+  }
+  else{
+    cur_rd <- rd
+    
+    cur_lin <- principal_curve(cur_rd)
+    
+    plot(cur_rd, col = col_vector[clusters], 
+         pch = 16, type = "p")
+    lines(cur_lin, lwd = 3)
+    
+    mat.out <- matrix(data = NA, ncol = ncol(cur_rd) + 2, nrow = length(clusters))
+    rownames(mat.out) <- names(clusters)
+    colnames(mat.out) <- c(colnames(cur_rd), "rank", "lambda")
+    
+    mat.out[,1:ncol(cur_rd)] <- cur_lin$s
+    mat.out[,"rank"] <- order(cur_lin$ord)
+    mat.out[,"lambda"] <- cur_lin$lambda
+    
+    mat.out
+  }
+}
+
 #### Batch correction
 batch.correction <- function(sce, number.HVG = 1000){
   # Calculate highly variable genes and merge
