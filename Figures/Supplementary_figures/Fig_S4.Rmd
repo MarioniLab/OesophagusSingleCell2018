@@ -1,0 +1,80 @@
+---
+title: "Figure S4: Characterization of all GI tissues"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S4.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script highlights cell-types and differentially expressed genes within all tissues of the upper GI tract.
+For each tissue, we re-perform batch correction and visualize cell-types using tSNE dimensionality reduction.
+
+# Read in the data
+
+```{r libraries, message=FALSE}
+library(scran)
+library(scater)
+library(DropletUtils)
+library(openxlsx)
+library(Rtsne)
+source("../../Analysis/Functions/auxiliary.R")
+
+sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+
+# Remove contaminating cell-types
+sce <- sce[,sce$include]
+sce <- normalize(sce)
+```
+
+# Normal oesophagus
+
+We will first visualize marker genes of normal oesophagus.
+
+## Dimensionality reduction
+
+```{r}
+cur_sce <- sce[,sce$Tissue == "NE"]
+cur_sce <- normalize(cur_sce)
+
+# Split the samples to perform batch correction
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+cur_sce <- do.call("cbind", sce.list)
+corrected <- batch.correction(sce.list)
+
+# Compute tSNE
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+
+# Create colour vector
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Unknown"] <- "grey"
+colour_vector["Suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[10]
+colour_vector["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[3]
+colour_vector["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[6]
+
+tsne.NE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  cell_type = cur_sce$cell_type)) + 
+  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
+  scale_color_manual(values = colour_vector) + theme_minimal()
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
+```
+
+## Marker gene expression
+
+We next order cells along their spatial postion in the tissue and visualize known marker genes along this trajectory.
+
+```{r}
+
+```
+
