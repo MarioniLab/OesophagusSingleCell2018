@@ -14,7 +14,7 @@ knit: (function(inputFile, encoding) { rmarkdown::render(inputFile,
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-This script focuses on the similarity analysis between BE and other tissues: GC, SMG and D2.
+This script focuses on the similarity analysis between BE and other tissues: SCJ, GOJ, GC, SMG and D2.
 
 # Read in the data
 
@@ -24,8 +24,23 @@ library(scater)
 library(DropletUtils)
 library(openxlsx)
 library(Rtsne)
-source("../../Analysis/Functions/auxiliary.R")
+source("../Analysis/Functions/auxiliary.R")
 sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+```
+
+# Visualize GC, GOJ, BE and SCJ samples
+
+Here we perform differential expression (DE) analysis between the epithelial tissues of the GC, GOJ, SCJ, BE and NE samples.
+
+```{r}
+# Select tissues to test
+cur_sce <- sce[,sce$include]
+cur_sce <- cur_sce[,cur_sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ")]
+cur_sce <- normalize(cur_sce)
+
+# Visualize tSNE
+
+
 ```
 
 # Plot circular dendrogram of all clusters
