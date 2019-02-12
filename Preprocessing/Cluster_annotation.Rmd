@@ -52,6 +52,7 @@ annot <- read.xlsx("../../../Dropbox (Cambridge University)/Oesophagus_single_ce
 m <- match(paste(sce$Tissue, sce$Tissue_cluster, sep = "_"), 
            paste(annot$tissue, annot$cluster, sep = "_"))
 sce$cell_type <- annot$cell_type[m]
+sce$tissue_type <- annot$Tissue_type[m]
 sce$include <- annot$include[m]
 sce$confidence <- annot$Confidence[m]
 ```
