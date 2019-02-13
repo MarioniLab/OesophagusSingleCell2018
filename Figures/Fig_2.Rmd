@@ -194,6 +194,9 @@ for(i in 1:length(cond)){
                                        tissue2, ", levels = design)", sep = ""))))
   cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
   
+  # Print the number of genes being differentially expressed
+  print(sum(cur_markers$FDR < 0.1)/nrow(mat))
+  
   # Save markers
   cur_out <- list()
   cur_out[[tissue2]] <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.1,]
@@ -207,6 +210,24 @@ for(i in 1:length(cond)){
   out[[paste(tissue1, "vs", tissue2, sep = "_")]] <- cur_out
 }
 
+```
+
+# Visualize KRT7 expression
+
+Here, we visualize the expression of KRT7 in the tissues analysed above.
+
+```{r}
+KRT7 <- data.frame(KRT7 = logcounts(cur_sce)["ENSG00000135480",],
+                   tissue = factor(cur_sce$Tissue, levels = c("NE", "GOJ", "GC", "SCJ", "BE")),
+                   tissue_type = factor(cur_sce$tissue_type, levels = c("Squamous", "Columnar")))
+
+p.KRT7 <- ggplot(KRT7) +
+  geom_boxplot(aes(tissue, KRT7, fill = tissue_type, colour = tissue_type)) + 
+  scale_colour_manual(values = c("dark red", "dark blue")) +
+  scale_fill_manual(values = c(adjustcolor("dark red", alpha.f = 0.5), 
+                               adjustcolor("dark blue", alpha.f = 0.5)))
+
+ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/KRT7_boxplots.pdf", width = 7, height = 4)
 ```
 
 # Plot circular dendrogram of all clusters
