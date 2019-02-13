@@ -24,6 +24,7 @@ library(scater)
 library(DropletUtils)
 library(openxlsx)
 library(Rtsne)
+library(pheatmap)
 source("../Analysis/Functions/auxiliary.R")
 sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
@@ -34,13 +35,42 @@ Here we perform differential expression (DE) analysis between the epithelial tis
 
 ```{r}
 # Select tissues to test
-cur_sce <- sce[,sce$include]
-cur_sce <- cur_sce[,cur_sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ")]
+cur_corrected <- metadata(sce)$corrected[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ")]
+cur_sce <- sce[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ")]
 cur_sce <- normalize(cur_sce)
 
 # Visualize tSNE
+p.all.cells <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
+                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
+                  tissue = colData(cur_sce)$Tissue)) + 
+  geom_point(aes(tsne1, tsne2, colour = tissue)) + 
+  scale_color_manual(values = metadata(cur_sce)$colour_vector) + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "grey"))
 
+# Hierarchical clustering to visualize the tissue relationship
+euc.dist <- dist(t(cur_corrected), method = "euclidean")
 
+# Generate matrix for visualization
+mat <- matrix(rep(0, ncol(cur_sce)), ncol = ncol(cur_sce), nrow = 1)
+colnames(mat) <- paste(cur_sce$Patient, cur_sce$Tissue, cur_sce$Barcode, sep = "_")
+
+# Use pheatmap to visualize samples
+pheatmap(mat, clustering_distance_cols = euc.dist, cluster_rows = FALSE,
+         show_rownames = FALSE, show_colnames = FALSE,
+         annotation_col = data.frame(row.names = colnames(mat),
+                                     patient_type = cur_sce$Patient,
+                                     cell_type = cur_sce$cell_type,
+                                     tissue_type = cur_sce$tissue_type))
+
+pheatmap(mat, cluster_rows = FALSE,
+         show_rownames = FALSE, show_colnames = FALSE,
+         annotation_col = data.frame(row.names = colnames(mat),
+                                     patient_type = cur_sce$Patient,
+                                     cell_type = cur_sce$cell_type,
+                                     tissue_type = cur_sce$tissue_type))
 ```
 
 # Plot circular dendrogram of all clusters
