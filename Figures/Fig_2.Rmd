@@ -25,6 +25,8 @@ library(DropletUtils)
 library(openxlsx)
 library(Rtsne)
 library(pheatmap)
+library(cowplot)
+library(RColorBrewer)
 source("../Analysis/Functions/auxiliary.R")
 sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
@@ -35,14 +37,31 @@ Here we perform differential expression (DE) analysis between the epithelial tis
 
 ```{r}
 # Select tissues to test
-cur_corrected <- metadata(sce)$corrected[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ")]
+#cur_corrected <- metadata(sce)$corrected[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ")]
 cur_sce <- sce[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ")]
 cur_sce <- normalize(cur_sce)
 
-# Visualize tSNE
+# Perform batch correction
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+sce.list <- sce.list[c(which(grepl("NE", names(sce.list))),
+                       which(grepl("GOJ", names(sce.list))),
+                       which(grepl("SCJ", names(sce.list))),
+                       which(grepl("GC", names(sce.list))),
+                       which(grepl("BE", names(sce.list))))]
+corrected <- batch.correction(sce.list)
+cur_sce <- do.call("cbind", sce.list)
+
+# Compute new tSNE
+set.seed(11111)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+reducedDims(cur_sce)$TSNE <- tsne$Y
+
+# Visualize tSNEs
+# Tissue
 p.all.cells <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
                   tsne2 = reducedDims(cur_sce)$TSNE[,2],
                   tissue = colData(cur_sce)$Tissue)) + 
+  geom_point(aes(tsne1, tsne2), colour = "black", size = 2) + 
   geom_point(aes(tsne1, tsne2, colour = tissue)) + 
   scale_color_manual(values = metadata(cur_sce)$colour_vector) + 
   theme(panel.grid.major = element_blank(), 
@@ -50,27 +69,68 @@ p.all.cells <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
         panel.background = element_blank(), 
         axis.line = element_line(colour = "grey"))
 
-# Hierarchical clustering to visualize the tissue relationship
-euc.dist <- dist(t(cur_corrected), method = "euclidean")
+# Tissue typse
+p.all.cells.tissue_type <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
+                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
+                  tissue = colData(cur_sce)$tissue_type)) +
+  geom_point(aes(tsne1, tsne2), colour = "black", size = 2) + 
+  geom_point(aes(tsne1, tsne2, colour = tissue)) + 
+  scale_color_manual(values = c("dark blue", "dark red")) + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "grey"))
 
-# Generate matrix for visualization
-mat <- matrix(rep(0, ncol(cur_sce)), ncol = ncol(cur_sce), nrow = 1)
-colnames(mat) <- paste(cur_sce$Patient, cur_sce$Tissue, cur_sce$Barcode, sep = "_")
+# Cell type
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Unknown"] <- "grey20"
+colour_vector["Suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[10]
+colour_vector["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
+colour_vector["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
+colour_vector["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[1]
+colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[10]
+colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark blue"))(10)[10]
+colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[3]
+colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[6]
+colour_vector["Chief"] <- colorRampPalette(c("white", "dark blue"))(10)[6]
+colour_vector["Parietal"] <- colorRampPalette(c("white", "dark blue"))(10)[3]
+colour_vector["Foveolar_Intermediate/goblet"] <- "black"
+colour_vector["Endocrine/Undifferentiated"] <- "grey60"
+colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
 
-# Use pheatmap to visualize samples
-pheatmap(mat, clustering_distance_cols = euc.dist, cluster_rows = FALSE,
-         show_rownames = FALSE, show_colnames = FALSE,
-         annotation_col = data.frame(row.names = colnames(mat),
-                                     patient_type = cur_sce$Patient,
-                                     cell_type = cur_sce$cell_type,
-                                     tissue_type = cur_sce$tissue_type))
+p.all.cells.cell_type <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
+                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
+                  tissue = colData(cur_sce)$cell_type)) +
+  geom_point(aes(tsne1, tsne2), colour = "black", size = 2) + 
+  geom_point(aes(tsne1, tsne2, colour = tissue)) + 
+  scale_color_manual(values = colour_vector) + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "grey"))
 
-pheatmap(mat, cluster_rows = FALSE,
-         show_rownames = FALSE, show_colnames = FALSE,
-         annotation_col = data.frame(row.names = colnames(mat),
-                                     patient_type = cur_sce$Patient,
-                                     cell_type = cur_sce$cell_type,
-                                     tissue_type = cur_sce$tissue_type))
+# Visualize patient
+# Colouring for patient
+colour_vector <- vector(length = length(unique(cur_sce$Patient)))
+names(colour_vector) <- unique(cur_sce$Patient)
+colour_vector <- brewer.pal(7, "Accent")
+
+p.all.cells.patient <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
+                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
+                  tissue = colData(cur_sce)$Patient)) +
+  geom_point(aes(tsne1, tsne2), colour = "black", size = 2) + 
+  geom_point(aes(tsne1, tsne2, colour = tissue)) + 
+  scale_color_manual(values = colour_vector) + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "grey"))
+
+# Save tSNEs
+final <- plot_grid(p.all.cells, p.all.cells.tissue_type, p.all.cells.cell_type, p.all.cells.patient,
+                   ncol = 2, nrow = 2)
+ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/GC_NE_tSNEs.pdf", width = 15, height = 15)
 ```
 
 # Plot circular dendrogram of all clusters
