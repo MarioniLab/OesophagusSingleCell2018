@@ -270,3 +270,12 @@ pca.p <- ggplot(data.frame(Component1 = mat[1,],
 ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/PCA_cell_types_corrected.pdf", pca.p, width = 10, height = 10)
 ```
 
+# Visualize entropy measure for all tissue types
+
+```{r}
+# Select cells of interest
+cur_sce <- sce[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ", "SMG")]
+cur_sce <- normalize(cur_sce)
+
+```
+

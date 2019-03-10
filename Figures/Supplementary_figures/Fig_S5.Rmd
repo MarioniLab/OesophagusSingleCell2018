@@ -1,5 +1,5 @@
 ---
-title: "Figure S5: Similarity between BE and all other tissues"
+title: "Figure S5: Characterization of BE cells"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -7,14 +7,14 @@ output:
     toc: true
     toc_depth: 2
 knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S4.html') })
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S5.html') })
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Here, we perform additional analyses on the similarity between BE and all other tissues.
+This script plots cell-types of BE and highlights marker genes.
 
 # Read in the data
 
@@ -26,106 +26,82 @@ library(openxlsx)
 library(Rtsne)
 library(pheatmap)
 library(viridis)
-library(ape)
 source("../../Analysis/Functions/auxiliary.R")
 
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+
+# Remove contaminating cell-types
+sce <- sce[,sce$include]
+sce <- normalize(sce)
 ```
 
-# Plot circular dendrogram of all clusters
+# Barret's oesophagus
 
-To estimate the similarity between all cell types, we compute an averaged expression profile for each cell-type and perform hierarchical cluster analysis.
-Here, we calculate this on the non-batch corrected counts and thereby incorporating the inter-patient variation.
-We will first plot the dendogram across all genes, removing lowly expressed genes
+We will visualize marker genes of Barret's oesophagus.
+
+## Dimensionality reduction
 
 ```{r}
-clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
-mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(sce))
-colnames(mat) <- unique(clusters)
+cur_sce <- sce[,sce$Tissue == "BE"]
+cur_sce <- normalize(cur_sce)
 
-for(i in unique(clusters)){
-  mat[,i] <- Matrix::rowMeans(logcounts(sce)[,clusters == i])
-}
+# Split the samples to perform batch correction
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+cur_sce <- do.call("cbind", sce.list)
+corrected <- batch.correction(sce.list)
 
-# Rename the matrix to contain the actual cell-type labels
-for(i in 1:ncol(mat)){
-  colnames(mat)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
-                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
-}
+# Compute tSNE
+set.seed(123)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
 
-# Remove lowly expressed genes
-mat <- mat[rowMeans(mat) > 0.1,]
+# Create colour vector
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Undifferentiated"] <- "white"
+colour_vector["Dividing"] <- colorRampPalette(c("white", "#00A087FF"))(10)[2]
+colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#00A087FF"))(10)[4]
+colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#00A087FF"))(10)[6]
+colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark green"))(10)[5]
+colour_vector["Goblet"] <- colorRampPalette(c("white", "dark green"))(10)[10]
 
-# Calculate euclidean distance on corrected counts
-dend <- hclust(as.dist(sqrt(1 - cor(mat, method = "spearman"))/2), method = "ward.D2")
-pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/Tree_all_genes.pdf", width = 10, height = 10)
-plot(as.phylo(dend), type = "fan", 
-     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
-dev.off()
+tsne.BE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  cell_type = cur_sce$cell_type)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
+  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
+  scale_color_manual(values = colour_vector) + theme_minimal()
 
-# Plot PCA
-# Plot first two components
-pca <- prcomp(t(mat))
-pca.p <- ggplot(data.frame(Component1 = pca$x[,1],
-                  Component2 = pca$x[,2],
-                  tissue_type = sub("_[0-9]*$", "", unique(clusters)),
-                  cell_type = colnames(mat))) +
-  geom_point(aes(Component1, Component2, colour = tissue_type)) +
-  scale_colour_manual(values = metadata(sce)$colour_vector) + 
-  geom_text(aes(Component1, Component2, label = cell_type))
-
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/PCA_cell_types_all_genes.pdf", pca.p, width = 10, height = 10)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/BE_tsne.pdf", tsne.BE, width = 6, height = 5)
 ```
 
-Next we will use the same genes as the ones for batch correction.
+## Marker gene expression
+
+Here, we visualize marker gene expression in form of a heatmap
 
 ```{r}
-clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
+genes <- c("MUC5AC", "KRT20", 
+           "MUC6", 
+           "MUC2", "TFF3", "KRT7",
+           "CHGA", 
+           "OLFM4")
 
-# Find highly variable genes
-sce.list <- split.sce(sce, unique(sce$Sample), colData.name = "Sample")
+for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
+colnames(for.heatmap) <- paste(cur_sce$Barcode, cur_sce$Patient, sep = "_")
 
-HVG.genes <- lapply(sce.list, function(n){
-  HVG <- trendVar(n, use.spikes = FALSE)
-  decomposeVar(n, HVG)
-})
-  
-HVG.df <- do.call("combineVar", HVG.genes)
-HVG.df <- HVG.df[order(HVG.df$bio, decreasing = TRUE),]
-genes <- rownames(HVG.df)[1:1000]
+# Order cells by cell-type
+ordering <- c(which(cur_sce$cell_type == "Undifferentiated"),
+              which(cur_sce$cell_type == "Dividing"),
+               which(cur_sce$cell_type == "Foveolar_Intermediate"),
+               which(cur_sce$cell_type == "Foveolar_differentiated"),
+               which(cur_sce$cell_type == "Endocrine"),
+               which(cur_sce$cell_type == "Goblet"))
 
-mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = 1000)
-colnames(mat) <- unique(clusters)
-
-for(i in unique(clusters)){
-  mat[,i] <- Matrix::rowMeans(logcounts(sce)[genes,clusters == i])
-}
-
-# Rename the matrix to contain the actual cell-type labels
-for(i in 1:ncol(mat)){
-  colnames(mat)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
-                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
-}
-
-# Calculate euclidean distance on corrected counts
-dend <- hclust(as.dist(sqrt(1 - cor(mat, method = "spearman"))/2), method = "ward.D2")
-pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/Tree_HVG.pdf", width = 10, height = 10)
-plot(as.phylo(dend), type = "fan", 
-     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/BE_heatmap.pdf", height = 7, width = 7)
+pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100), 
+         labels_row = genes, show_colnames = FALSE,
+         annotation_col = data.frame(row.names = colnames(for.heatmap)[ordering],
+                                     cell_type = cur_sce$cell_type[ordering]), 
+         annotation_colors = list(cell_type = colour_vector),
+         cluster_cols = FALSE)
 dev.off()
-
-# Plot PCA
-# Plot first two components
-pca <- prcomp(t(mat))
-pca.p <- ggplot(data.frame(Component1 = pca$x[,1],
-                  Component2 = pca$x[,2],
-                  tissue_type = sub("_[0-9]*$", "", unique(clusters)),
-                  cell_type = colnames(mat))) +
-  geom_point(aes(Component1, Component2, colour = tissue_type)) +
-  scale_colour_manual(values = metadata(sce)$colour_vector) + 
-  geom_text(aes(Component1, Component2, label = cell_type))
-
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/PCA_cell_types_HVG.pdf", pca.p, width = 10, height = 10)
-
 ```
-
