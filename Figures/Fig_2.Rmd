@@ -257,17 +257,6 @@ pdf("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figu
 plot(as.phylo(dend), type = "fan", 
      tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
 dev.off()
-
-# Plot first two components
-pca.p <- ggplot(data.frame(Component1 = mat[1,],
-                  Component2 = mat[2,],
-                  tissue_type = sub("_[0-9]*$", "", unique(clusters)),
-                  cell_type = colnames(mat))) +
-  geom_point(aes(Component1, Component2, colour = tissue_type)) +
-  scale_colour_manual(values = metadata(sce)$colour_vector) + 
-  geom_text(aes(Component1, Component2, label = cell_type))
-
-ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/PCA_cell_types_corrected.pdf", pca.p, width = 10, height = 10)
 ```
 
 # Visualize entropy measure for all tissue types
@@ -275,7 +264,18 @@ ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/F
 ```{r}
 # Select cells of interest
 cur_sce <- sce[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ", "SMG")]
+cur_sce <- cur_sce[,cur_sce$include]
 cur_sce <- normalize(cur_sce)
 
+# Visualize broad clusters
+all_clusters <- ggplot(data.frame(tSNE1 = reducedDims(cur_sce)$TSNE[,1],
+                  tSNE2 = reducedDims(cur_sce)$TSNE[,2],
+                  clusters = as.factor(cur_sce$Global_cluster))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
+  scale_color_manual(values = c(brewer.pal(8, "Set1"), 
+                                brewer.pal(8, "Set2"), 
+                                brewer.pal(8, "Set3")))
+
+ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/Global_clusters.pdf", all_clusters, width = 10, height = 10)
 ```
 
