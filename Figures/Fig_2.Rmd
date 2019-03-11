@@ -29,6 +29,7 @@ library(cowplot)
 library(RColorBrewer)
 library(edgeR)
 library(ape)
+library(viridis)
 source("../Analysis/Functions/auxiliary.R")
 sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
@@ -263,8 +264,7 @@ dev.off()
 
 ```{r}
 # Select cells of interest
-cur_sce <- sce[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ", "SMG")]
-cur_sce <- cur_sce[,cur_sce$include]
+cur_sce <- sce[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ", "SMG", "D2")]
 cur_sce <- normalize(cur_sce)
 
 # Visualize broad clusters
@@ -272,10 +272,107 @@ all_clusters <- ggplot(data.frame(tSNE1 = reducedDims(cur_sce)$TSNE[,1],
                   tSNE2 = reducedDims(cur_sce)$TSNE[,2],
                   clusters = as.factor(cur_sce$Global_cluster))) + 
   geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
+  xlim(c(-35,40)) + ylim(c(-35,40)) + 
   scale_color_manual(values = c(brewer.pal(8, "Set1"), 
                                 brewer.pal(8, "Set2"), 
                                 brewer.pal(8, "Set3")))
 
 ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/Global_clusters.pdf", all_clusters, width = 10, height = 10)
+```
+
+# Calculate entropy per tissue
+
+As described in Grun et al, 2016, we use the cell-wise entropy to calculate a possible measure for the stem-like characteristic per cell.
+
+```{r}
+# Calculate the entropy within GC
+cur_sce <- sce[,sce$include & sce$Tissue == "GC"]
+
+# Remove lowly expressed genes
+cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
+
+# Bring normalized counts on the real scale
+cur_counts <- 2^(logcounts(cur_sce)) - 1
+
+# Calculate entropy
+probs   <- t(t(cur_counts)/apply(cur_counts,2,sum))
+logprobs <- log(probs)
+logprobs[logprobs == -Inf] <- 0
+entropy <- -apply(probs*logprobs/log(nrow(cur_sce)),2,sum)
+
+# Plot entropy
+GC.entropy <- ggplot(data.frame(
+  tSNE1 = reducedDims(sce[,sce$include & sce$Tissue == "GC"])$TSNE[,1],
+  tSNE2 = reducedDims(sce[,sce$include & sce$Tissue == "GC"])$TSNE[,2],
+  entropy = entropy)) + 
+  geom_point(aes(tSNE1, tSNE2, colour = entropy)) + 
+    xlim(c(-35,40)) + ylim(c(-35,40)) + 
+  scale_colour_gradientn(colours = cividis(100), limits = c(0.14,0.72))
+
+# Calculate the entropy within BE
+cur_sce <- sce[,sce$include & sce$Tissue == "BE"]
+
+# Remove lowly expressed genes
+cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
+
+# Bring normalized counts on the real scale
+cur_counts <- 2^(logcounts(cur_sce)) - 1
+
+# Calculate entropy
+probs   <- t(t(cur_counts)/apply(cur_counts,2,sum))
+logprobs <- log(probs)
+logprobs[logprobs == -Inf] <- 0
+entropy <- -apply(probs*logprobs/log(nrow(cur_sce)),2,sum)
+
+# Plot entropy
+BE.entropy <- ggplot(data.frame(
+  tSNE1 = reducedDims(sce[,sce$include & sce$Tissue == "BE"])$TSNE[,1],
+  tSNE2 = reducedDims(sce[,sce$include & sce$Tissue == "BE"])$TSNE[,2],
+  entropy = entropy)) + 
+  geom_point(aes(tSNE1, tSNE2, colour = entropy)) + 
+  xlim(c(-35,40)) + ylim(c(-35,40)) + 
+  scale_colour_gradientn(colours = cividis(100), limits = c(0.14,0.72))
+
+# Calculate the entropy within D2
+cur_sce <- sce[,sce$include & sce$Tissue == "D2"]
+
+# Remove lowly expressed genes
+cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
+
+# Bring normalized counts on the real scale
+cur_counts <- 2^(logcounts(cur_sce)) - 1
+
+# Calculate entropy
+probs   <- t(t(cur_counts)/apply(cur_counts,2,sum))
+logprobs <- log(probs)
+logprobs[logprobs == -Inf] <- 0
+entropy <- -apply(probs*logprobs/log(nrow(cur_sce)),2,sum)
+
+# Plot entropy
+D2.entropy <- ggplot(data.frame(
+  tSNE1 = reducedDims(sce[,sce$include & sce$Tissue == "D2"])$TSNE[,1],
+  tSNE2 = reducedDims(sce[,sce$include & sce$Tissue == "D2"])$TSNE[,2],
+  entropy = entropy)) + 
+  geom_point(aes(tSNE1, tSNE2, colour = entropy)) + 
+  xlim(c(-35,40)) + ylim(c(-35,40)) + 
+  scale_colour_gradientn(colours = cividis(100), limits = c(0.14,0.72))
+
+ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/GC_entropy.pdf", GC.entropy, width = 10, height = 10)
+ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/BE_entropy.pdf", BE.entropy, width = 10, height = 10)
+ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/D2_entropy.pdf", D2.entropy, width = 10, height = 10)
+
+# Visualize distribution of counts across genes for selected cells
+cur_min <- logcounts(cur_sce[,which.min(entropy)])
+cur_max <- logcounts(cur_sce[,which.max(entropy)])
+test <- data.frame(min.ent = as.numeric(cur_min[order(cur_min[,1], 
+                                                       decreasing = TRUE),]),
+                   max.ent = as.numeric(cur_max[order(cur_max[,1], 
+                                                       decreasing = TRUE),]))
+entropy_example <- ggplot(test[1:4000,]) + 
+  geom_line(aes(1:4000, max.ent), colour = "blue") + 
+  geom_line(aes(1:4000, min.ent), colour = "red") + 
+  ylab("log2(Expr)") + xlab("Genes ordered by expression")
+ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/Entropy_example.pdf",
+       entropy_example, width = 5, height = 3)
 ```
 
