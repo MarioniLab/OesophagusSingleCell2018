@@ -1,5 +1,5 @@
 ---
-title: "Figure S5: Similarity between BE and all other tissues"
+title: "Figure S6: Similarity between BE and all other tissues"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 2
 knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S4.html') })
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S6.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -58,7 +58,7 @@ mat <- mat[rowMeans(mat) > 0.1,]
 
 # Calculate euclidean distance on corrected counts
 dend <- hclust(as.dist(sqrt(1 - cor(mat, method = "spearman"))/2), method = "ward.D2")
-pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/Tree_all_genes.pdf", width = 10, height = 10)
+pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S6/Tree_all_genes.pdf", width = 10, height = 10)
 plot(as.phylo(dend), type = "fan", 
      tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
 dev.off()
@@ -74,7 +74,7 @@ pca.p <- ggplot(data.frame(Component1 = pca$x[,1],
   scale_colour_manual(values = metadata(sce)$colour_vector) + 
   geom_text(aes(Component1, Component2, label = cell_type))
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/PCA_cell_types_all_genes.pdf", pca.p, width = 10, height = 10)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S6/PCA_cell_types_all_genes.pdf", pca.p, width = 10, height = 10)
 ```
 
 Next we will use the same genes as the ones for batch correction.
@@ -109,7 +109,7 @@ for(i in 1:ncol(mat)){
 
 # Calculate euclidean distance on corrected counts
 dend <- hclust(as.dist(sqrt(1 - cor(mat, method = "spearman"))/2), method = "ward.D2")
-pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/Tree_HVG.pdf", width = 10, height = 10)
+pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S6/Tree_HVG.pdf", width = 10, height = 10)
 plot(as.phylo(dend), type = "fan", 
      tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
 dev.off()
@@ -125,7 +125,7 @@ pca.p <- ggplot(data.frame(Component1 = pca$x[,1],
   scale_colour_manual(values = metadata(sce)$colour_vector) + 
   geom_text(aes(Component1, Component2, label = cell_type))
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/PCA_cell_types_HVG.pdf", pca.p, width = 10, height = 10)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S6/PCA_cell_types_HVG.pdf", pca.p, width = 10, height = 10)
 
 ```
 
