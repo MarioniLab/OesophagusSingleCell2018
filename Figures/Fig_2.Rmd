@@ -160,54 +160,21 @@ for(i in 1:length(cond)){
   cell_types <- unlist(strsplit(cond[[i]][3], "-"))
   
   # Select cells
-  sce_to_test <- cur_sce[,(cur_sce$Tissue == tissue1 | cur_sce$Tissue == tissue2) &
+  sce_to_test <- cur_sce[,(cur_sce$Tissue == tissue1 | 
+                             cur_sce$Tissue == tissue2) &
                            cur_sce$cell_type %in% cell_types]
   
-  # Sum counts with each batch and group
-  mat <- matrix(data = NA, ncol = length(unique(paste(colData(sce_to_test)$Patient, 
-                                          colData(sce_to_test)$Tissue, sep = "_"))), 
-               nrow = nrow(counts(sce_to_test)))
-  rownames(mat) <- rownames(counts(sce_to_test))
-  colnames(mat) <- unique(paste(colData(sce_to_test)$Patient, 
-                                  colData(sce_to_test)$Tissue, sep = "_"))
+  # Remove non-expressed genes 
+  sce_to_test <- sce_to_test[Matrix::rowSums(counts(sce_to_test)) > 0,]
   
-  for(j in colnames(mat)){
-    cur_patient <- unlist(strsplit(j, "_"))[1]
-    cur_tissue <- unlist(strsplit(j, "_"))[2]
-    mat[,j] <- Matrix::rowSums(counts(sce_to_test)[,colData(sce_to_test)$Patient == cur_patient &
-                                                  colData(sce_to_test)$Tissue == cur_tissue]) 
-  }
+  # Peform DE
+  cur_out <- DE.edgeR(sce = sce_to_test,
+                      conditions = sce_to_test$Tissue,
+                      covariate = sce_to_test$Patient,
+                      lfc = 0.5)
   
-  # Remove lowly expressed genes after scale normalizing, rpm - reads per million
-  rpm <- t(t(mat)/(colSums(mat)/1000000))
-  mat <- mat[rowMeans(rpm) > 1,]
-  
-  # Perform differential testing
-  y <- DGEList(counts=mat,
-               group=sapply(colnames(mat), 
-                           function(n){unlist(strsplit(n, "_"))[1]}))
-  y <- calcNormFactors(y)
-  design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
-  colnames(design) <- substring(colnames(design), regexpr("})", colnames(design)) + 2)
-  y <- estimateDisp(y,design)
-  
-  fit <- glmQLFit(y,design, robust = TRUE)
-  qlf <- glmTreat(fit,coef=2, lfc = 0.5, 
-    contrast = eval(parse(text = paste("makeContrasts(", tissue1,  " - ", 
-                                       tissue2, ", levels = design)", sep = ""))))
-  cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
-  
-  # Print the number of genes being differentially expressed
-  print(sum(cur_markers$FDR < 0.1)/nrow(mat))
-  
-  # Save markers
-  cur_out <- list()
-  cur_out[[tissue2]] <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.1,]
-  cur_out[[tissue2]]$Genename <- rowData(sce_to_test)$Symbol[match(rownames(cur_out[[tissue2]]),
-                                                                   rowData(sce_to_test)$ID)]
-  cur_out[[tissue1]] <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.1,]
-  cur_out[[tissue1]]$Genename <- rowData(sce_to_test)$Symbol[match(rownames(cur_out[[tissue1]]),
-                                                                   rowData(sce_to_test)$ID)]
+  # Calculate the percentage of DE genes
+  print(nrow(do.call("rbind", cur_out))/nrow(sce_to_test))
   
   # Save in output list
   out[[paste(tissue1, "vs", tissue2, sep = "_")]] <- cur_out
