@@ -171,7 +171,8 @@ for(i in 1:length(cond)){
   cur_out <- DE.edgeR(sce = sce_to_test,
                       conditions = sce_to_test$Tissue,
                       covariate = sce_to_test$Patient,
-                      lfc = 0.5)
+                      lfc = 0.5,
+                      FDR = 0.1)
   
   # Calculate the percentage of DE genes
   print(nrow(do.call("rbind", cur_out))/nrow(sce_to_test))

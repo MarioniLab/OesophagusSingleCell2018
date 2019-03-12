@@ -210,7 +210,7 @@ batch.correction.old <- function(sce, number.HVG = 1000){
 }
 
 # Differnetial expression testing using edgeR
-DE.edgeR <- function(sce, conditions, covariate, lfc){
+DE.edgeR <- function(sce, conditions, covariate, lfc, FDR){
   # Collect summed counts in matrix
   mat <- matrix(data = NA, 
                 ncol = length(unique(paste(covariate, conditions, sep = "_"))), 
@@ -245,12 +245,30 @@ DE.edgeR <- function(sce, conditions, covariate, lfc){
   
   # Save markers
   cur_out <- list()
-  cur_out[[colnames(design)[2]]] <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.1,]
+  cur_out[[colnames(design)[2]]] <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < FDR,]
   cur_out[[colnames(design)[2]]]$Genename <- rowData(sce)$Symbol[match(rownames(cur_out[[colnames(design)[2]]]),
                                                                    rowData(sce)$ID)]
-  cur_out[[colnames(design)[1]]] <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.1,]
+  cur_out[[colnames(design)[1]]] <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < FDR,]
   cur_out[[colnames(design)[1]]]$Genename <- rowData(sce)$Symbol[match(rownames(cur_out[[colnames(design)[1]]]),
                                                                    rowData(sce)$ID)]
   
   cur_out
+}
+
+# Multi-group DE
+multi.DE <- function(sce, conditions, covariate, lfc){
+  # Select unique conditions
+  cond <- unique(conditions)
+  
+  # List to store tests
+  cur_out <- list()
+  
+  # Loop through different comparisons
+  for(i in seq(1,length(cond)-1)){
+    for(j in seq(i+1, length(cond), 1)){
+      cur_sce <- sce[,conditions %in% cond[c(i,j)]]
+      
+    }
+  }
+
 }
