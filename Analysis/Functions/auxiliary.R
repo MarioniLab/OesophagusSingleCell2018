@@ -213,14 +213,14 @@ batch.correction.old <- function(sce, number.HVG = 1000){
 DE.edgeR <- function(sce, conditions, covariate, lfc, FDR){
   # Collect summed counts in matrix
   mat <- matrix(data = NA, 
-                ncol = length(unique(paste(covariate, conditions, sep = "_"))), 
+                ncol = length(unique(paste(covariate, conditions, sep = " "))), 
                 nrow = nrow(sce))
   rownames(mat) <- rownames(counts(sce))
-  colnames(mat) <- unique(paste(covariate, conditions, sep = "_"))
+  colnames(mat) <- unique(paste(covariate, conditions, sep = " "))
   
   for(j in colnames(mat)){
-    cur_covariate <- unlist(strsplit(j, "_"))[1]
-    cur_condition <- unlist(strsplit(j, "_"))[2]
+    cur_covariate <- unlist(strsplit(j, " "))[1]
+    cur_condition <- unlist(strsplit(j, " "))[2]
     mat[,j] <- Matrix::rowSums(counts(sce)[,covariate == cur_covariate &
                                              conditions == cur_condition]) 
   }
@@ -228,11 +228,11 @@ DE.edgeR <- function(sce, conditions, covariate, lfc, FDR){
   # Perform differential testing
   y <- DGEList(counts=mat,
                group=sapply(colnames(mat), 
-                            function(n){unlist(strsplit(n, "_"))[1]}))
+                            function(n){unlist(strsplit(n, " "))[1]}))
   y <- calcNormFactors(y)
   
   # Generate design matrix
-  design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
+  design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, " "))[2]}))
   colnames(design) <- substring(colnames(design), regexpr("})", colnames(design)) + 2)
   y <- estimateDisp(y,design)
   
@@ -256,8 +256,9 @@ DE.edgeR <- function(sce, conditions, covariate, lfc, FDR){
 }
 
 # Multi-group DE
-multi.DE <- function(sce, conditions, covariate, lfc){
+multi.DE <- function(sce, conditions, covariate, lfc, FDR){
   # Select unique conditions
+  conditions <- sub("-", "_", conditions)
   cond <- unique(conditions)
   
   # List to store tests
@@ -267,8 +268,91 @@ multi.DE <- function(sce, conditions, covariate, lfc){
   for(i in seq(1,length(cond)-1)){
     for(j in seq(i+1, length(cond), 1)){
       cur_sce <- sce[,conditions %in% cond[c(i,j)]]
+      cur_conditions <- conditions[conditions %in% cond[c(i,j)]]
+      cur_covariate <- covariate[conditions %in% cond[c(i,j)]]
       
+      # Collect summed counts in matrix
+      mat <- matrix(data = NA, 
+                    ncol = length(unique(paste(cur_covariate, cur_conditions, sep = " "))), 
+                    nrow = nrow(cur_sce))
+      rownames(mat) <- rownames(counts(cur_sce))
+      colnames(mat) <- unique(paste(cur_covariate, cur_conditions, sep = " "))
+      
+      for(k in colnames(mat)){
+        cur_cov <- unlist(strsplit(k, " "))[1]
+        cur_cond <- unlist(strsplit(k, " "))[2]
+        if(sum(cur_covariate == cur_cov &
+               cur_conditions == cur_cond) < 2){
+          next
+        }
+        mat[,k] <- Matrix::rowSums(counts(cur_sce)[,cur_covariate == cur_cov &
+                                                 cur_conditions == cur_cond]) 
+      }
+      mat <- mat[,!is.na(mat[1,])]
+      
+      # Perform differential testing
+      y <- DGEList(counts=mat,
+                   group=sapply(colnames(mat), 
+                                function(n){unlist(strsplit(n, " "))[1]}))
+      y <- calcNormFactors(y)
+      
+      # Generate design matrix
+      design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, " "))[2]}))
+      colnames(design) <- substring(colnames(design), regexpr("})", colnames(design)) + 2)
+      y <- estimateDisp(y,design)
+      
+      # Fit the model
+      fit <- glmQLFit(y,design, robust = TRUE)
+      qlf <- glmTreat(fit,coef=2, lfc = lfc, 
+                      contrast = eval(parse(text = paste("makeContrasts(", colnames(design)[1],  " - ", 
+                                                         colnames(design)[2], ", levels = design)", sep = ""))))
+      # Save results
+      cur_out[[paste(colnames(design)[1], colnames(design)[2])]] <- qlf$table
     }
   }
-
+  
+    # Combine results into dataframe
+  final_out <- list()
+  for(i in cond){
+    cur_df <- data.frame(row.names = rownames(sce))
+    cur_p <- data.frame(row.names = rownames(sce))
+    cur_comp <- cur_out[unlist(lapply(strsplit(names(cur_out), " "),
+                               function(n){n[1] == i | n[2] == i}))] 
+    for(j in 1:length(cur_comp)){
+      if(which(unlist(strsplit(names(cur_comp)[j], " ")) == i) == 1){
+        cur_df[[unlist(strsplit(names(cur_comp)[j], " "))[2]]] <- cur_comp[[j]]$logFC
+        cur_p[[unlist(strsplit(names(cur_comp)[j], " "))[2]]] <- cur_comp[[j]]$PValue
+      }
+      else{
+        cur_df[[unlist(strsplit(names(cur_comp)[j], " "))[1]]] <- -cur_comp[[j]]$logFC
+        cur_p[[unlist(strsplit(names(cur_comp)[j], " "))[1]]] <- cur_comp[[j]]$PValue
+      }
+    }
+      
+    # Combine P values
+    cur_df$PValue <- eval(parse(text = paste0("combinePValues(", 
+                                              paste0("cur_p[,", 1:ncol(cur_p), "],", collapse = " "), 
+                                              " method = 'fisher')")))
+    cur_df$FDR <- p.adjust(cur_df$PValue, method = "fdr")
+    
+    # Add the gene names
+    cur_df$ID <- rownames(cur_df)
+    cur_df$Symbol <- rowData(sce)$Symbol[match(rownames(cur_df), rowData(sce)$ID)]
+     
+    # Order genes pased on P value
+    cur_df <- cur_df[order(cur_df$FDR, decreasing = FALSE),]
+    
+    # Exclude genes with FDR smaller than the specified value
+    cur_df <- cur_df[cur_df$FDR < FDR,]
+    
+    # Select only genes with throught positive logFC
+    cur_df <- cur_df[apply(cur_df[,1:(ncol(cur_df) - 4)], 1, function(n){
+      sum(n > 0) == ncol(cur_df) - 4
+    }),]
+    
+    # Save in list
+    final_out[[i]] <- cur_df
+  }
+  # Return object
+  final_out
 }
