@@ -74,6 +74,25 @@ tsne.NE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
 ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
 ```
 
+## Marker genes expression
+
+Here, we perform pairwise DE testing to find cluster specific marker genes.
+
+```{r}
+# Remove non-expressed genes
+cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
+
+# Perform DE to find marker genes
+DE.genes <- multi.DE(sce = cur_sce, 
+                     conditions = cur_sce$cell_type,
+                     covariate = cur_sce$Patient,
+                     lfc = 0.5,
+                     FDR = 0.1)
+
+# Save as table
+write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S3.xlsx")
+```
+
 ## Marker gene expression
 
 We next order cells along their spatial postion in the tissue and visualize known marker genes along this trajectory.
@@ -148,6 +167,25 @@ tsne.GC <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
 ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/GC_tsne.pdf", tsne.GC, width = 6, height = 5)
 ```
 
+## Marker genes expression
+
+Here, we perform pairwise DE testing to find cluster specific marker genes.
+
+```{r}
+# Remove non-expressed genes
+cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
+
+# Perform DE to find marker genes
+DE.genes <- multi.DE(sce = cur_sce, 
+                     conditions = cur_sce$cell_type,
+                     covariate = cur_sce$Patient,
+                     lfc = 0.5,
+                     FDR = 0.1)
+
+# Save as table
+write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S4.xlsx")
+```
+
 ## Marker gene expression
 
 Here, we visualize marker gene expression in form of a heatmap
@@ -215,6 +253,25 @@ tsne.D2 <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
   scale_color_manual(values = colour_vector) + theme_minimal()
 
 ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/D2_tsne.pdf", tsne.D2, width = 6, height = 5)
+```
+
+## Marker genes expression
+
+Here, we perform pairwise DE testing to find cluster specific marker genes.
+
+```{r}
+# Remove non-expressed genes
+cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
+
+# Perform DE to find marker genes
+DE.genes <- multi.DE(sce = cur_sce, 
+                     conditions = cur_sce$cell_type,
+                     covariate = cur_sce$Patient,
+                     lfc = 0.5,
+                     FDR = 0.1)
+
+# Save as table
+write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S5.xlsx")
 ```
 
 ## Marker gene expression
