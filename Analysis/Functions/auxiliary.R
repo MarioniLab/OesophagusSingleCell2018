@@ -208,3 +208,49 @@ batch.correction.old <- function(sce, number.HVG = 1000){
   corrected <- eval( parse(text=func) )
   do.call("cbind", corrected$corrected)
 }
+
+# Differnetial expression testing using edgeR
+DE.edgeR <- function(sce, conditions, covariate, lfc){
+  # Collect summed counts in matrix
+  mat <- matrix(data = NA, 
+                ncol = length(unique(paste(covariate, conditions, sep = "_"))), 
+                nrow = nrow(sce))
+  rownames(mat) <- rownames(counts(sce))
+  colnames(mat) <- unique(paste(covariate, conditions, sep = "_"))
+  
+  for(j in colnames(mat)){
+    cur_covariate <- unlist(strsplit(j, "_"))[1]
+    cur_condition <- unlist(strsplit(j, "_"))[2]
+    mat[,j] <- Matrix::rowSums(counts(sce)[,covariate == cur_covariate &
+                                             conditions == cur_condition]) 
+  }
+  
+  # Perform differential testing
+  y <- DGEList(counts=mat,
+               group=sapply(colnames(mat), 
+                            function(n){unlist(strsplit(n, "_"))[1]}))
+  y <- calcNormFactors(y)
+  
+  # Generate design matrix
+  design <- model.matrix(~0+sapply(colnames(mat), function(n){unlist(strsplit(n, "_"))[2]}))
+  colnames(design) <- substring(colnames(design), regexpr("})", colnames(design)) + 2)
+  y <- estimateDisp(y,design)
+  
+  # Fit the model
+  fit <- glmQLFit(y,design, robust = TRUE)
+  qlf <- glmTreat(fit,coef=2, lfc = lfc, 
+                  contrast = eval(parse(text = paste("makeContrasts(", colnames(design)[1],  " - ", 
+                                                     colnames(design)[2], ", levels = design)", sep = ""))))
+  cur_markers <- topTags(qlf, n = nrow(qlf$table))$table
+  
+  # Save markers
+  cur_out <- list()
+  cur_out[[colnames(design)[2]]] <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < 0.1,]
+  cur_out[[colnames(design)[2]]]$Genename <- rowData(sce)$Symbol[match(rownames(cur_out[[colnames(design)[2]]]),
+                                                                   rowData(sce)$ID)]
+  cur_out[[colnames(design)[1]]] <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < 0.1,]
+  cur_out[[colnames(design)[1]]]$Genename <- rowData(sce)$Symbol[match(rownames(cur_out[[colnames(design)[1]]]),
+                                                                   rowData(sce)$ID)]
+  
+  cur_out
+}
