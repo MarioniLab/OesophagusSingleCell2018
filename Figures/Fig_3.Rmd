@@ -31,6 +31,7 @@ library(edgeR)
 library(ape)
 library(viridis)
 library(umap)
+library(reshape2)
 source("../Analysis/Functions/auxiliary.R")
 sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
@@ -167,13 +168,114 @@ UMAP_stemLikeCells <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
   scale_colour_manual(values = metadata(cur_sce)$colour_vector)
 
 ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/UMAP_stem_cells.pdf", UMAP_stemLikeCells, width = 7, height = 5)
+
+# Compute the fration of cells per cell type per tissue (GC, BE, D2, SMG)
+cur_sce <- cur_sce[,cur_sce$Tissue %in% c("GC", "BE", "D2", "SMG")]
+
+cur_mat <- table(cur_sce$cell_type, cur_sce$Tissue)
+cur_mat <- t(t(cur_mat)/colSums(cur_mat))
+cur_df <- melt(cur_mat)
+
+# Create colour vector for cell types
+colour_vector <- vector(length = nrow(cur_mat))
+names(colour_vector) <- rownames(cur_mat)
+colour_vector["Chief"] <- colorRampPalette(c("white", "dark blue"))(10)[6]
+colour_vector["Dividing"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[3]
+colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark blue"))(10)[10]
+colour_vector["Enterocytes_Intermediate"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[6]
+colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[10]
+colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[6]
+colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
+colour_vector["Mucous"] <- "saddlebrown"
+colour_vector["Paneth"] <- colorRampPalette(c("white", "seagreen4"))(10)[6]
+colour_vector["Serous"] <- "burlywood3"
+colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[1]
+colour_vector["Duct_intercalating"] <- "burlywood4"
+
+cell_type.barplot <- ggplot(cur_df) +
+  geom_col(aes(Var2, value, fill = Var1), colour = "black", lwd = 0.5) + 
+  scale_fill_manual(values = colour_vector)
+
+ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/Cell_type_proportion.pdf", cell_type.barplot, width = 7, height = 5)
 ```
 
 # Differential expression testing for progenitor cells between tissues 
 
-Here, we use edgeR to perform DE between progeitor cells of the different tissues.
+Here, we use edgeR to perform DE between progenitor cells of the different tissues.
 
 ```{r}
+# Define the comparisons
+conds <- list(c("BE", "GC"),
+              c("BE", "D2"),
+              c("BE", "SMG"))
 
+# List to save results
+cur_out <- list()
+
+for(i in conds){
+  sce_for_test <- cur_sce[,cur_sce$Tissue %in% i] 
+  sce_for_test <- sce_for_test[Matrix::rowSums(counts(sce_for_test)) > 0,]
+  
+  # DE
+  cur_DE <- DE.edgeR(sce_for_test, conditions = sce_for_test$Tissue,
+           covariate = sce_for_test$Patient,
+           lfc = 0.5, FDR = 0.1)
+  
+  # Label data.frames based by tissue specificity
+  cur_DE[[1]]$specificity <- names(cur_DE)[1]
+  cur_DE[[2]]$specificity <- names(cur_DE)[2]
+  
+  # Combine into one dataframe
+  new_df <- rbind(cur_DE[[1]], cur_DE[[2]][seq(nrow(cur_DE[[2]]), 1),])
+  
+  # Save results
+  cur_out[[paste(names(cur_DE)[1], names(cur_DE)[2], sep = "_vs_")]] <- new_df
+}
+
+# Save results
+write.xlsx(cur_out, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S7.xlsx")
+```
+
+# Perform dimensionality reduction for GC and BE together
+
+To find genes that are cell-type specific and differentially expressed between GC and BE, we focus the analysis only on these 2 tissues.
+
+```{r}
+# Select tissues 
+cur_sce <- sce[,sce$include & sce$Tissue %in% c("GC", "BE")]
+
+# Deselect cell types that do not match between tissues
+cur_sce <- cur_sce[,!(cur_sce$cell_type %in% c("Chief", "Endocrine", "Goblet", "Parietal"))]
+
+# Remove genes that are not expressed
+cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
+cur_sce <- normalize(cur_sce)
+
+# Perform batch correction
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+sce.list <- sce.list[c(which(grepl("GC", names(sce.list))),
+                       which(grepl("BE", names(sce.list))))]
+corrected <- batch.correction(sce.list)
+cur_sce <- do.call("cbind", sce.list)
+
+# Dimensionality reduction
+UMAP <- umap(t(corrected))
+
+UMAP_BE_GC.tissue <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
+                  UMAP2 = UMAP$layout[,2],
+                  tissue = cur_sce$Tissue)) +
+  geom_point(aes(UMAP1, UMAP2, colour = tissue)) +
+  scale_colour_manual(values = metadata(cur_sce)$colour_vector)
+
+UMAP_BE_GC.cell_type <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
+                  UMAP2 = UMAP$layout[,2],
+                  tissue = cur_sce$cell_type)) +
+  geom_point(aes(UMAP1, UMAP2), colour = "black", size = 2) +
+  geom_point(aes(UMAP1, UMAP2, colour = tissue)) +
+  scale_colour_manual(values = colour_vector)
+
+# Save figures
+ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_GC_tissue.pdf", UMAP_BE_GC.tissue, width = 7, height = 5)
+ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_GC_cell_type.pdf", UMAP_BE_GC.cell_type, width = 7, height = 5)
 ```
 
