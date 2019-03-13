@@ -168,35 +168,6 @@ UMAP_stemLikeCells <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
   scale_colour_manual(values = metadata(cur_sce)$colour_vector)
 
 ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/UMAP_stem_cells.pdf", UMAP_stemLikeCells, width = 7, height = 5)
-
-# Compute the fration of cells per cell type per tissue (GC, BE, D2, SMG)
-cur_sce <- cur_sce[,cur_sce$Tissue %in% c("GC", "BE", "D2", "SMG")]
-
-cur_mat <- table(cur_sce$cell_type, cur_sce$Tissue)
-cur_mat <- t(t(cur_mat)/colSums(cur_mat))
-cur_df <- melt(cur_mat)
-
-# Create colour vector for cell types
-colour_vector <- vector(length = nrow(cur_mat))
-names(colour_vector) <- rownames(cur_mat)
-colour_vector["Chief"] <- colorRampPalette(c("white", "dark blue"))(10)[6]
-colour_vector["Dividing"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[3]
-colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark blue"))(10)[10]
-colour_vector["Enterocytes_Intermediate"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[6]
-colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[10]
-colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[6]
-colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
-colour_vector["Mucous"] <- "saddlebrown"
-colour_vector["Paneth"] <- colorRampPalette(c("white", "seagreen4"))(10)[6]
-colour_vector["Serous"] <- "burlywood3"
-colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[1]
-colour_vector["Duct_intercalating"] <- "burlywood4"
-
-cell_type.barplot <- ggplot(cur_df) +
-  geom_col(aes(Var2, value, fill = Var1), colour = "black", lwd = 0.5) + 
-  scale_fill_manual(values = colour_vector)
-
-ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/Cell_type_proportion.pdf", cell_type.barplot, width = 7, height = 5)
 ```
 
 # Differential expression testing for progenitor cells between tissues 
@@ -267,6 +238,14 @@ UMAP_BE_GC.tissue <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
   geom_point(aes(UMAP1, UMAP2, colour = tissue)) +
   scale_colour_manual(values = metadata(cur_sce)$colour_vector)
 
+# Colour vector for cell-types
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Dividing"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[3]
+colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[10]
+colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[6]
+colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[1]
+
 UMAP_BE_GC.cell_type <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
                   UMAP2 = UMAP$layout[,2],
                   tissue = cur_sce$cell_type)) +
@@ -277,5 +256,13 @@ UMAP_BE_GC.cell_type <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
 # Save figures
 ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_GC_tissue.pdf", UMAP_BE_GC.tissue, width = 7, height = 5)
 ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_GC_cell_type.pdf", UMAP_BE_GC.cell_type, width = 7, height = 5)
+```
+
+# Differential expression testing between cell types
+
+Here, we perform DE between progenitor and differentiated cell types and across tissues.
+
+```{r}
+
 ```
 
