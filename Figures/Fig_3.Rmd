@@ -188,9 +188,11 @@ for(i in conds){
   sce_for_test <- sce_for_test[Matrix::rowSums(counts(sce_for_test)) > 0,]
   
   # DE
+  # Note: We set the FDR to 1 to return all tested genes
+  # This is important for pathway analysis
   cur_DE <- DE.edgeR(sce_for_test, conditions = sce_for_test$Tissue,
            covariate = sce_for_test$Patient,
-           lfc = 0.5, FDR = 0.1)
+           lfc = 0.5, FDR = 1)
   
   # Label data.frames based by tissue specificity
   cur_DE[[1]]$specificity <- names(cur_DE)[1]
@@ -314,9 +316,6 @@ Diff_BE_vs_GC.out <- rbind(Diff_BE_vs_GC$GC,
               seq(nrow(Diff_BE_vs_GC$BE), 1),])
 out$Diff_BE_vs_GC <- Diff_BE_vs_GC.out
 
-# Save results
-write.xlsx(out, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S8.xlsx")
-
 # Find overlap between Undiff and Diff specific genes and tissue comparisons
 # We save the comparison between the tissues
 # We then remove unecessary columns and add the comparison between undiff and diff
@@ -392,5 +391,65 @@ out$BE_diff_specific <- BE_diff
 
 # Save results
 write.xlsx(out, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S9.xlsx")
+```
+
+# Save all genes that were tested
+
+To generate Table S8, we will rerun the DE analysis but this time by storing all (also the non-DE) genes.
+
+```{r}
+# List to save result
+out <- list()
+
+# DE within GC tissue
+sce_test <- cur_sce[,cur_sce$Tissue == "GC" & cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated")]
+GC_Undiff_vs_Diff <- DE.edgeR(sce_test, conditions = sce_test$cell_type,
+                              covariate = sce_test$Patient, lfc = 0.5,
+                              FDR = 1)
+GC_Undiff_vs_Diff$Undifferentiated$specificity <- "Undifferentiated"
+GC_Undiff_vs_Diff$Foveolar_differentiated$specificity <- "Foveolar_differentiated"
+GC_Undiff_vs_Diff.out <- rbind(GC_Undiff_vs_Diff$Undifferentiated,
+                               GC_Undiff_vs_Diff$Foveolar_differentiated[
+              seq(nrow(GC_Undiff_vs_Diff$Foveolar_differentiated), 1),])
+out$GC_Undiff_vs_Diff <- GC_Undiff_vs_Diff.out
+
+# DE within BE tissue
+sce_test <- cur_sce[,cur_sce$Tissue == "BE" & cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated")]
+BE_Undiff_vs_Diff <- DE.edgeR(sce_test, conditions = sce_test$cell_type,
+                              covariate = sce_test$Patient, lfc = 0.5,
+                              FDR = 1)
+BE_Undiff_vs_Diff$Undifferentiated$specificity <- "Undifferentiated"
+BE_Undiff_vs_Diff$Foveolar_differentiated$specificity <- "Foveolar_differentiated"
+BE_Undiff_vs_Diff.out <- rbind(BE_Undiff_vs_Diff$Undifferentiated,
+                               BE_Undiff_vs_Diff$Foveolar_differentiated[
+              seq(nrow(BE_Undiff_vs_Diff$Foveolar_differentiated), 1),])
+out$BE_Undiff_vs_Diff <- BE_Undiff_vs_Diff.out
+
+# DE within undiff cells tissue
+sce_test <- cur_sce[,cur_sce$cell_type == "Undifferentiated"]
+Undiff_BE_vs_GC <- DE.edgeR(sce_test, conditions = sce_test$Tissue,
+                              covariate = sce_test$Patient, lfc = 0.5,
+                              FDR = 1)
+Undiff_BE_vs_GC$GC$specificity <- "GC"
+Undiff_BE_vs_GC$BE$specificity <- "BE"
+Undiff_BE_vs_GC.out <- rbind(Undiff_BE_vs_GC$GC,
+                               Undiff_BE_vs_GC$BE[
+              seq(nrow(Undiff_BE_vs_GC$BE), 1),])
+out$Undiff_BE_vs_GC <- Undiff_BE_vs_GC.out
+
+# DE within diff cells tissue
+sce_test <- cur_sce[,cur_sce$cell_type == "Foveolar_differentiated"]
+Diff_BE_vs_GC <- DE.edgeR(sce_test, conditions = sce_test$Tissue,
+                              covariate = sce_test$Patient, lfc = 0.5,
+                              FDR = 1)
+Diff_BE_vs_GC$GC$specificity <- "GC"
+Diff_BE_vs_GC$BE$specificity <- "BE"
+Diff_BE_vs_GC.out <- rbind(Diff_BE_vs_GC$GC,
+                               Diff_BE_vs_GC$BE[
+              seq(nrow(Diff_BE_vs_GC$BE), 1),])
+out$Diff_BE_vs_GC <- Diff_BE_vs_GC.out
+
+# Save results
+write.xlsx(out, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S8.xlsx")
 ```
 
