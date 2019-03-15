@@ -245,10 +245,10 @@ DE.edgeR <- function(sce, conditions, covariate, lfc, FDR){
   
   # Save markers
   cur_out <- list()
-  cur_out[[colnames(design)[2]]] <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR < FDR,]
+  cur_out[[colnames(design)[2]]] <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR <= FDR,]
   cur_out[[colnames(design)[2]]]$Genename <- rowData(sce)$Symbol[match(rownames(cur_out[[colnames(design)[2]]]),
                                                                    rowData(sce)$ID)]
-  cur_out[[colnames(design)[1]]] <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR < FDR,]
+  cur_out[[colnames(design)[1]]] <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR <= FDR,]
   cur_out[[colnames(design)[1]]]$Genename <- rowData(sce)$Symbol[match(rownames(cur_out[[colnames(design)[1]]]),
                                                                    rowData(sce)$ID)]
   
@@ -343,7 +343,7 @@ multi.DE <- function(sce, conditions, covariate, lfc, FDR){
     cur_df <- cur_df[order(cur_df$FDR, decreasing = FALSE),]
     
     # Exclude genes with FDR smaller than the specified value
-    cur_df <- cur_df[cur_df$FDR < FDR,]
+    cur_df <- cur_df[cur_df$FDR <= FDR,]
     
     # Select only genes with throught positive logFC
     cur_df <- cur_df[apply(cur_df[,1:(ncol(cur_df) - 4)], 1, function(n){
