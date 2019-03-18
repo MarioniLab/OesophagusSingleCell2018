@@ -167,6 +167,12 @@ UMAP_stemLikeCells <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
   geom_point(aes(UMAP1, UMAP2, colour = tissue)) +
   scale_colour_manual(values = metadata(cur_sce)$colour_vector)
 
+# Visualize gene expression
+ggplot(data.frame(gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "REG4",],
+                  tissue = colData(cur_sce)$Tissue, 
+                  patient = colData(cur_sce)$Patient)) +
+  geom_boxplot(aes(tissue, gene, fill = patient))
+
 ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/UMAP_stem_cells.pdf", UMAP_stemLikeCells, width = 7, height = 5)
 ```
 
