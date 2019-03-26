@@ -136,18 +136,36 @@ genes <- c("KRT7", "TFF3", "MUC5B", "KRT8", "CDH1", "SLPI",
            "ACTA2", "MMP7", "SOX9", "MKI67", "KRT23", "KRT14",
            "OLFM4", "KRT5")
 
+# Remove somatic cells
+cur_corrected <- corrected[,cur_sce$cell_type %in% 
+                     c("Mucous", "Serous", "Duct_intercalating", "Myo-epithelial")]
+cur_sce <- cur_sce[,cur_sce$cell_type %in% 
+                     c("Mucous", "Serous", "Duct_intercalating", "Myo-epithelial")]
+cur_sce <- normalize(cur_sce)
 for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
 colnames(for.heatmap) <- paste(cur_sce$Barcode, cur_sce$Patient, sep = "_")
 
 # Calculate euclidean distance using the factors after batch correction
-euc.dist <- dist(t(corrected), method = "euclidean")
+euc.dist <- dist(t(cur_corrected), method = "euclidean")
 
 # Colouring for patient
 patient_vector <- c("dark red", "dark blue", "dark green")
 names(patient_vector) <- c("Patient10", "Patient11", "Patient13")
 
-pdf(file = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_1/SMG_heatmap.pdf", height = 7, width = 8)
+pdf(file = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_1/SMG_heatmap_lognorm.pdf", height = 7, width = 8)
 pheatmap(for.heatmap, cluster_rows = FALSE, color = viridis(100), 
+         labels_row = genes, show_colnames = FALSE, clustering_distance_cols = euc.dist,
+         annotation_col = data.frame(row.names = colnames(for.heatmap),
+                                     cell_type = cur_sce$cell_type,
+                                     patient = cur_sce$Patient), 
+         annotation_colors = list(cell_type = colour_vector,
+                                  patient = patient_vector))
+dev.off()
+
+pdf(file = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_1/SMG_heatmap_zscore.pdf", height = 7, width = 8)
+pheatmap(for.heatmap, cluster_rows = FALSE, 
+         color = colorRampPalette(c("dark blue", "blue", "white", "red", "dark red"))(100), 
+         scale = "row",
          labels_row = genes, show_colnames = FALSE, clustering_distance_cols = euc.dist,
          annotation_col = data.frame(row.names = colnames(for.heatmap),
                                      cell_type = cur_sce$cell_type,
