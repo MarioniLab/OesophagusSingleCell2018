@@ -1,5 +1,5 @@
 ---
-title: "Figure S7: Cell type proportions in stem cells"
+title: "Figure S7: Entropy measures in duodenum and normal oesophagus"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -14,73 +14,90 @@ knit: (function(inputFile, encoding) { rmarkdown::render(inputFile,
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+Here, we compute the entropy per cell for duodenum and normal oesophagus cells as a control for this measure to detect stem-cell-like phenotypes.
+
 # Read in the data
 
 ```{r libraries, message=FALSE}
-library(scran)
-library(scater)
-library(DropletUtils)
-library(openxlsx)
 library(Rtsne)
-library(pheatmap)
-library(cowplot)
-library(RColorBrewer)
-library(edgeR)
-library(ape)
 library(viridis)
-library(umap)
-library(reshape2)
-source("../Analysis/Functions/auxiliary.R")
-sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+source("../../Analysis/Functions/auxiliary.R")
+sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+sce <- sce[,sce$include]
 ```
 
-# Visualize stem-like cell cluster
+# Entropy in D2 samples
 
-Here, we select the cluster that could contain stem-like cells and recluster.
+Here, we compute the entropy in the duodenum samples.
 
 ```{r}
-# Select cluster 7
-cur_sce <- sce[,sce$include & sce$Global_cluster == 7]
+# Select D2 cells
+cur_sce <- sce[,sce$Tissue == "D2"]
+
+# Only genes that are expressed
 cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
 cur_sce <- normalize(cur_sce)
 
-# Perform batch correction
+# Bring normalized counts on the real scale
+cur_counts <- 2^(logcounts(cur_sce)) - 1
+
+# Calculate entropy
+probs   <- t(t(cur_counts)/apply(cur_counts,2,sum))
+logprobs <- log(probs)
+logprobs[logprobs == -Inf] <- 0
+entropy <- -apply(probs*logprobs/log(nrow(cur_sce)),2,sum)
+
+# Visualize in form of heatmap
 sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
-sce.list <- sce.list[c(which(grepl("GOJ", names(sce.list))),
-                       which(grepl("SCJ", names(sce.list))),
-                       which(grepl("GC", names(sce.list))),
-                       which(grepl("BE", names(sce.list))),
-                       which(grepl("D2", names(sce.list))),
-                       which(grepl("SMG", names(sce.list))))]
-corrected <- batch.correction(sce.list)
 cur_sce <- do.call("cbind", sce.list)
+corrected <- batch.correction(sce.list)
 
-# Compute the fration of cells per cell type per tissue (GC, BE, D2, SMG)
-cur_sce <- cur_sce[,cur_sce$Tissue %in% c("GC", "BE", "D2", "SMG")]
+# Compute tSNE
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
 
-cur_mat <- table(cur_sce$cell_type, cur_sce$Tissue)
-cur_mat <- t(t(cur_mat)/colSums(cur_mat))
-cur_df <- melt(cur_mat)
-
-# Create colour vector for cell types
-colour_vector <- vector(length = nrow(cur_mat))
-names(colour_vector) <- rownames(cur_mat)
-colour_vector["Chief"] <- colorRampPalette(c("white", "dark blue"))(10)[6]
-colour_vector["Dividing"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[3]
-colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark blue"))(10)[10]
+# Create colour vector
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
 colour_vector["Enterocytes_Intermediate"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[6]
-colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[10]
-colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[6]
-colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
-colour_vector["Mucous"] <- "saddlebrown"
-colour_vector["Paneth"] <- colorRampPalette(c("white", "seagreen4"))(10)[6]
-colour_vector["Serous"] <- "burlywood3"
+colour_vector["Enterocytes_differentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[10]
+colour_vector["Dividing"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[3]
 colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[1]
-colour_vector["Duct_intercalating"] <- "burlywood4"
+colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
+colour_vector["Paneth"] <- colorRampPalette(c("white", "seagreen4"))(10)[6]
 
-cell_type.barplot <- ggplot(cur_df) +
-  geom_col(aes(Var2, value, fill = Var1), colour = "black", lwd = 0.5) + 
-  scale_fill_manual(values = colour_vector)
+tsne.D2 <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  cell_type = cur_sce$cell_type)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
+  scale_color_manual(values = colour_vector) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S7/Cell_type_proportion.pdf", cell_type.barplot, width = 7, height = 5)
+# Colour by entropy
+tsne.D2.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100)) + theme_minimal()
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S7/D2_tsne.pdf", tsne.D2, width = 6, height = 5)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S7/D2_tsne_entropy.pdf", tsne.D2.entropy, width = 6, height = 5)
+
+# Correlate genes to entropy
+null.dist <- correlateNull(ncells = ncol(cur_sce), iters = 100000)
+cur_mat <- rbind(logcounts(cur_sce), entropy)
+cors <- correlatePairs(cur_mat, null.dist=null.dist, 
+                       pairings = list(c("entropy"), rownames(logcounts(cur_sce))))
+cors$genename <- rowData(cur_sce)$Symbol[match(cors$gene2, rowData(cur_sce)$ID)]
+cors <- cors[order(cors$rho, decreasing = TRUE),]
+
+# Gene expression
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "EEF1A1",])) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
+  scale_color_viridis() + theme_minimal()
 ```
+
