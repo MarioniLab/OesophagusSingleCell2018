@@ -101,3 +101,77 @@ ggplot(data.frame(tSNE1 = tsne$Y[,1],
   scale_color_viridis() + theme_minimal()
 ```
 
+# Entropy in NE samples
+
+Here, we compute the entropy in the normal oesophagus samples.
+
+```{r}
+# Select D2 cells
+cur_sce <- sce[,sce$Tissue == "NE"]
+
+# Only genes that are expressed
+cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
+cur_sce <- normalize(cur_sce)
+
+# Bring normalized counts on the real scale
+cur_counts <- 2^(logcounts(cur_sce)) - 1
+
+# Calculate entropy
+probs   <- t(t(cur_counts)/apply(cur_counts,2,sum))
+logprobs <- log(probs)
+logprobs[logprobs == -Inf] <- 0
+entropy <- -apply(probs*logprobs/log(nrow(cur_sce)),2,sum)
+
+# Visualize in form of heatmap
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+cur_sce <- do.call("cbind", sce.list)
+corrected <- batch.correction(sce.list)
+
+# Compute tSNE
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+
+# Create colour vector
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Unknown"] <- "grey"
+colour_vector["Suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[10]
+colour_vector["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
+colour_vector["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
+colour_vector["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[1]
+
+tsne.NE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  cell_type = cur_sce$cell_type)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
+  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
+  scale_color_manual(values = colour_vector) + theme_minimal()
+
+# Colour by entropy
+tsne.NE.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100)) + theme_minimal()
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S7/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S7/NE_tsne_entropy.pdf", tsne.NE.entropy, width = 6, height = 5)
+
+# Correlate genes to entropy
+null.dist <- correlateNull(ncells = ncol(cur_sce), iters = 100000)
+cur_mat <- rbind(logcounts(cur_sce), entropy)
+cors <- correlatePairs(cur_mat, null.dist=null.dist, 
+                       pairings = list(c("entropy"), rownames(logcounts(cur_sce))))
+cors$genename <- rowData(cur_sce)$Symbol[match(cors$gene2, rowData(cur_sce)$ID)]
+cors <- cors[order(cors$rho, decreasing = TRUE),]
+
+# Gene expression
+ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "EEF1A1",])) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
+  scale_color_viridis() + theme_minimal()
+```
+
