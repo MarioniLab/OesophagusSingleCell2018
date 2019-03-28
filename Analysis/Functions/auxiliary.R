@@ -256,7 +256,7 @@ DE.edgeR <- function(sce, conditions, covariate, lfc, FDR){
 }
 
 # Multi-group DE
-multi.DE <- function(sce, conditions, covariate, lfc, FDR){
+multi.DE <- function(sce, conditions, covariate, select.marker = TRUE, lfc, FDR){
   # Select unique conditions
   conditions <- sub("-", "_", conditions)
   cond <- unique(conditions)
@@ -311,7 +311,7 @@ multi.DE <- function(sce, conditions, covariate, lfc, FDR){
     }
   }
   
-    # Combine results into dataframe
+  # Combine results into dataframe
   final_out <- list()
   for(i in cond){
     cur_df <- data.frame(row.names = rownames(sce))
@@ -328,12 +328,17 @@ multi.DE <- function(sce, conditions, covariate, lfc, FDR){
         cur_p[[unlist(strsplit(names(cur_comp)[j], " "))[1]]] <- cur_comp[[j]]$PValue
       }
     }
-      
+    
+    # Add P values to data.fram
+    cur_df <- cbind(cur_df, cur_p)
+    colnames(cur_df) <- paste(colnames(cur_df), c(rep("logFC", ncol(cur_df)/2),
+                                        rep("PValue", ncol(cur_df)/2)), sep = "_")  
+    
     # Combine P values
-    cur_df$PValue <- eval(parse(text = paste0("combinePValues(", 
+    cur_df$Combined_PValue <- eval(parse(text = paste0("combinePValues(", 
                                               paste0("cur_p[,", 1:ncol(cur_p), "],", collapse = " "), 
                                               " method = 'fisher')")))
-    cur_df$FDR <- p.adjust(cur_df$PValue, method = "fdr")
+    cur_df$FDR <- p.adjust(cur_df$Combined_PValue, method = "fdr")
     
     # Add the gene names
     cur_df$ID <- rownames(cur_df)
@@ -345,10 +350,12 @@ multi.DE <- function(sce, conditions, covariate, lfc, FDR){
     # Exclude genes with FDR smaller than the specified value
     cur_df <- cur_df[cur_df$FDR <= FDR,]
     
-    # Select only genes with throught positive logFC
-    cur_df <- cur_df[apply(cur_df[,1:(ncol(cur_df) - 4)], 1, function(n){
-      sum(n > 0) == ncol(cur_df) - 4
-    }),]
+    # Select only genes with throught positive logFC if chosen by user
+    if(select.marker){
+      cur_df <- cur_df[apply(cur_df[,1:(ncol(cur_df) - 4)], 1, function(n){
+        sum(n > 0) == ncol(cur_df) - 4
+      }),]
+    }
     
     # Save in list
     final_out[[i]] <- cur_df
