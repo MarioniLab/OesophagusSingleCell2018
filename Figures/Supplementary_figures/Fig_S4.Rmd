@@ -82,12 +82,13 @@ Here, we perform pairwise DE testing to find cluster specific marker genes.
 # Remove non-expressed genes
 cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
 
-# Perform DE to find marker genes
+# Perform DE
 DE.genes <- multi.DE(sce = cur_sce, 
                      conditions = cur_sce$cell_type,
                      covariate = cur_sce$Patient,
+                     select.marker = FALSE,
                      lfc = 0.5,
-                     FDR = 0.1)
+                     FDR = 1)
 
 # Save as table
 write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S3.xlsx")
@@ -179,8 +180,9 @@ cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
 DE.genes <- multi.DE(sce = cur_sce, 
                      conditions = cur_sce$cell_type,
                      covariate = cur_sce$Patient,
+                     select.marker = FALSE,
                      lfc = 0.5,
-                     FDR = 0.1)
+                     FDR = 1)
 
 # Save as table
 write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S4.xlsx")
@@ -267,8 +269,9 @@ cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
 DE.genes <- multi.DE(sce = cur_sce, 
                      conditions = cur_sce$cell_type,
                      covariate = cur_sce$Patient,
+                     select.marker = FALSE,
                      lfc = 0.5,
-                     FDR = 0.1)
+                     FDR = 1)
 
 # Save as table
 write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S5.xlsx")
