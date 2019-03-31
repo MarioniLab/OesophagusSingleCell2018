@@ -77,8 +77,12 @@ annot.col[grepl("GC", names(annot.col))] <- colorRampPalette(c("white", "#4DBBD5
 annot.col[grepl("SMG", names(annot.col))] <- colorRampPalette(c("white", "#B09C85FF"))(17)[c(5,9,13)]
 
 # Plot tsne
-tsne.uncorrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], Sample = annot)) + 
-  geom_point(aes(tsne1, tsne2, colour = Sample)) + scale_colour_manual(values = annot.col) + theme_minimal()
+tsne.uncorrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], 
+                                      tsne2 = tsne$Y[,2], 
+                                      Sample = annot)) + 
+  geom_point(aes(tsne1, tsne2, colour = Sample)) + 
+  scale_colour_manual(values = annot.col) + 
+  theme_minimal()
 
 ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_uncorrected.pdf", tsne.uncorrected, width = 12, height = 7)
 ```
