@@ -86,24 +86,17 @@ ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Result
 ```{r}
 genes <- c("OLFM4", "PTMA", "DMBT1", "RPL7", "RPS3", "RPL35")
 
-# Remove somatic cells
-for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
-colnames(for.heatmap) <- paste(cur_sce$Barcode, cur_sce$Patient, cur_sce$Tissue, sep = "_")
+# Visualize gene expression in form of boxplots
+for.plot <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
+colnames(for.plot) <- paste(cur_sce$Tissue, cur_sce$cell_type, sep = "_")
+rownames(for.plot) <- genes
+df <- melt(as.matrix(for.plot))
+df$Tissue <- sapply(as.character(df$Var2), function(n){unlist(strsplit(n, "_"))[1]})
+df$Cell_type <- sub("^[A-Z2]*_", "", as.character(df$Var2))
 
-# Calculate euclidean distance using the factors after batch correction
-euc.dist <- dist(t(corrected), method = "euclidean")
-
-# Build colour vector
-
-
-pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S8/Stem_cell_heatmap.pdf", height = 7, width = 8)
-pheatmap(for.heatmap, cluster_rows = FALSE, color = viridis(100), 
-         labels_row = genes, show_colnames = FALSE, clustering_distance_cols = euc.dist,
-         annotation_col = data.frame(row.names = colnames(for.heatmap),
-                                     cell_type = cur_sce$cell_type,
-                                     tissue = cur_sce$Tissue), 
-         annotation_colors = list(cell_type = colour_vector,
-                                  tissue = metadata(sce)$colour_vector), 
-         clustering_method = "ward.D2")
-dev.off()
+# Boxplots
+ggplot(df) + geom_jitter(aes(Cell_type, value, fill = Cell_type), shape = 21, width = 0.3) +
+  facet_grid(Var1 ~ Tissue,scales = "free_x") +
+  scale_fill_manual(values = colour_vector) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
