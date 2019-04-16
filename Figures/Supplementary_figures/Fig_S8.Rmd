@@ -92,11 +92,18 @@ colnames(for.plot) <- paste(cur_sce$Tissue, cur_sce$cell_type, sep = "_")
 rownames(for.plot) <- genes
 df <- melt(as.matrix(for.plot))
 df$Tissue <- sapply(as.character(df$Var2), function(n){unlist(strsplit(n, "_"))[1]})
-df$Cell_type <- sub("^[A-Z2]*_", "", as.character(df$Var2))
+df$Cell_type <- factor(sub("^[A-Z2]*_", "", as.character(df$Var2)), 
+                       levels = c("Undifferentiated", "Dividing", "Foveolar_Intermediate",
+                                  "Foveolar_differentiated", "Enterocytes_Intermediate",
+                                  "Endocrine", "Chief", "Goblet", "Paneth", 
+                                  "Serous", "Mucous", "Duct_intercalating"))
 
-# Boxplots
-ggplot(df) + geom_jitter(aes(Cell_type, value, fill = Cell_type), shape = 21, width = 0.3) +
+# jitter plots
+marker.p <- ggplot(df) + 
+  geom_jitter(aes(Cell_type, value, fill = Cell_type), 
+              shape = 21, width = 0.3, size = 1, stroke = 0.1) +
   facet_grid(Var1 ~ Tissue,scales = "free_x") +
   scale_fill_manual(values = colour_vector) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggsave(filename = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S8/Marker_genes.pdf", width = 10, height = 7)
 ```
