@@ -459,3 +459,35 @@ out$Diff_BE_vs_GC <- Diff_BE_vs_GC.out
 write.xlsx(out, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S8.xlsx")
 ```
 
+# Visualize marker genes
+
+```{r}
+genes <- c("MYC", "HNF4A", "KRT7", "NCL", "CD44", "CLDN3", 
+           "MGST2", "MGST3", "CHCHD10", "DNPH1", 
+           "FBP1", "OCIAD2", "LEFTY1")
+
+# Remove somatic cells
+for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
+colnames(for.heatmap) <- paste(cur_sce$Barcode, cur_sce$Patient, cur_sce$Tissue, sep = "_")
+
+# Order cell types
+ind_order <- c(which(cur_sce$cell_type == "Undifferentiated" & cur_sce$Tissue == "GC"),
+               which(cur_sce$cell_type == "Foveolar_Intermediate" & cur_sce$Tissue == "GC"),
+               which(cur_sce$cell_type == "Foveolar_differentiated" & cur_sce$Tissue == "GC"),
+               which(cur_sce$cell_type == "Undifferentiated" & cur_sce$Tissue == "BE"),
+               which(cur_sce$cell_type == "Dividing" & cur_sce$Tissue == "BE"),
+               which(cur_sce$cell_type == "Foveolar_Intermediate" & cur_sce$Tissue == "BE"),
+               which(cur_sce$cell_type == "Foveolar_differentiated" & cur_sce$Tissue == "BE"))
+
+pdf(file = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/Marker_heatmap.pdf", height = 7, width = 8)
+pheatmap(for.heatmap[,ind_order], cluster_rows = FALSE, color = viridis(100), 
+         labels_row = genes, show_colnames = FALSE, cluster_cols = FALSE,
+         annotation_col = data.frame(row.names = colnames(for.heatmap)[ind_order],
+                                     cell_type = cur_sce$cell_type[ind_order],
+                                     tissue = cur_sce$Tissue[ind_order]), 
+         annotation_colors = list(cell_type = colour_vector,
+                                  tissue = metadata(sce)$colour_vector), 
+         clustering_method = "ward.D2")
+dev.off()
+```
+
