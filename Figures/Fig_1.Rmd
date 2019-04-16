@@ -162,16 +162,5 @@ pheatmap(for.heatmap, cluster_rows = FALSE, color = viridis(100),
                                   patient = patient_vector), 
          clustering_method = "ward.D2")
 dev.off()
-
-pdf(file = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_1/SMG_heatmap_lognorm.pdf", height = 7, width = 8)
-pheatmap(for.heatmap, cluster_rows = FALSE, 
-         color = viridis(100), 
-         labels_row = genes, show_colnames = FALSE, clustering_distance_cols = euc.dist,
-         annotation_col = data.frame(row.names = colnames(for.heatmap),
-                                     cell_type = cur_sce$cell_type,
-                                     patient = cur_sce$Patient), 
-         annotation_colors = list(cell_type = colour_vector,
-                                  patient = patient_vector))
-dev.off()
 ```
 

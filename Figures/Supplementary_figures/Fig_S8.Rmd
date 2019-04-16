@@ -30,33 +30,29 @@ library(ape)
 library(viridis)
 library(umap)
 library(reshape2)
-source("../Analysis/Functions/auxiliary.R")
-sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+source("../../Analysis/Functions/auxiliary.R")
+sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
 # Visualize stem-like cell cluster
 
-Here, we select the cluster that could contain stem-like cells and recluster.
+Here, we select the cluster that could contain stem-like cells and bisualize their cell proportions.
 
 ```{r}
 # Select cluster 7
 cur_sce <- sce[,sce$include & sce$Global_cluster == 7]
+cur_sce <- cur_sce[,cur_sce$Tissue %in% c("GC", "BE", "D2", "SMG")]
 cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
 cur_sce <- normalize(cur_sce)
 
 # Perform batch correction
 sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
-sce.list <- sce.list[c(which(grepl("GOJ", names(sce.list))),
-                       which(grepl("SCJ", names(sce.list))),
-                       which(grepl("GC", names(sce.list))),
+sce.list <- sce.list[c(which(grepl("GC", names(sce.list))),
                        which(grepl("BE", names(sce.list))),
                        which(grepl("D2", names(sce.list))),
                        which(grepl("SMG", names(sce.list))))]
 corrected <- batch.correction(sce.list)
 cur_sce <- do.call("cbind", sce.list)
-
-# Compute the fration of cells per cell type per tissue (GC, BE, D2, SMG)
-cur_sce <- cur_sce[,cur_sce$Tissue %in% c("GC", "BE", "D2", "SMG")]
 
 cur_mat <- table(cur_sce$cell_type, cur_sce$Tissue)
 cur_mat <- t(t(cur_mat)/colSums(cur_mat))
@@ -83,4 +79,31 @@ cell_type.barplot <- ggplot(cur_df) +
   scale_fill_manual(values = colour_vector)
 
 ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S8/Cell_type_proportion.pdf", cell_type.barplot, width = 7, height = 5)
+```
+
+# Visualize marker genes on heatmap
+
+```{r}
+genes <- c("OLFM4", "PTMA", "DMBT1", "RPL7", "RPS3", "RPL35")
+
+# Remove somatic cells
+for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
+colnames(for.heatmap) <- paste(cur_sce$Barcode, cur_sce$Patient, cur_sce$Tissue, sep = "_")
+
+# Calculate euclidean distance using the factors after batch correction
+euc.dist <- dist(t(corrected), method = "euclidean")
+
+# Build colour vector
+
+
+pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S8/Stem_cell_heatmap.pdf", height = 7, width = 8)
+pheatmap(for.heatmap, cluster_rows = FALSE, color = viridis(100), 
+         labels_row = genes, show_colnames = FALSE, clustering_distance_cols = euc.dist,
+         annotation_col = data.frame(row.names = colnames(for.heatmap),
+                                     cell_type = cur_sce$cell_type,
+                                     tissue = cur_sce$Tissue), 
+         annotation_colors = list(cell_type = colour_vector,
+                                  tissue = metadata(sce)$colour_vector), 
+         clustering_method = "ward.D2")
+dev.off()
 ```
