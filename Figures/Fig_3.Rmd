@@ -466,28 +466,139 @@ genes <- c("MYC", "HNF4A", "KRT7", "NCL", "CD44", "CLDN3",
            "MGST2", "MGST3", "CHCHD10", "DNPH1", 
            "FBP1", "OCIAD2", "LEFTY1")
 
-# Remove somatic cells
-for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
-colnames(for.heatmap) <- paste(cur_sce$Barcode, cur_sce$Patient, cur_sce$Tissue, sep = "_")
+# Visualize gene expression in form of boxplots
+for.plot <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol, ),]
+colnames(for.plot) <- paste(cur_sce$Tissue, cur_sce$cell_type, cur_sce$Barcode, sep = "_")
 
-# Order cell types
-ind_order <- c(which(cur_sce$cell_type == "Undifferentiated" & cur_sce$Tissue == "GC"),
-               which(cur_sce$cell_type == "Foveolar_Intermediate" & cur_sce$Tissue == "GC"),
-               which(cur_sce$cell_type == "Foveolar_differentiated" & cur_sce$Tissue == "GC"),
-               which(cur_sce$cell_type == "Undifferentiated" & cur_sce$Tissue == "BE"),
-               which(cur_sce$cell_type == "Dividing" & cur_sce$Tissue == "BE"),
-               which(cur_sce$cell_type == "Foveolar_Intermediate" & cur_sce$Tissue == "BE"),
-               which(cur_sce$cell_type == "Foveolar_differentiated" & cur_sce$Tissue == "BE"))
+# Order cells
+ind_order <- c(which(cur_sce$Tissue == "GC" & cur_sce$cell_type == "Undifferentiated"),
+               which(cur_sce$Tissue == "GC" & cur_sce$cell_type == "Foveolar_Intermediate"),
+               which(cur_sce$Tissue == "GC" & cur_sce$cell_type == "Foveolar_differentiated"),
+               which(cur_sce$Tissue == "BE" & cur_sce$cell_type == "Undifferentiated"),
+               which(cur_sce$Tissue == "BE" & cur_sce$cell_type == "Dividing"),
+               which(cur_sce$Tissue == "BE" & cur_sce$cell_type == "Foveolar_Intermediate"),
+               which(cur_sce$Tissue == "BE" & cur_sce$cell_type == "Foveolar_differentiated"))
 
-pdf(file = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/Marker_heatmap.pdf", height = 7, width = 8)
-pheatmap(for.heatmap[,ind_order], cluster_rows = FALSE, color = viridis(100), 
-         labels_row = genes, show_colnames = FALSE, cluster_cols = FALSE,
-         annotation_col = data.frame(row.names = colnames(for.heatmap)[ind_order],
+# Heatmap
+pdf("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/Heatmap_marker_genes.pdf", 
+    width = 10, height = 5)
+pheatmap(for.plot[,ind_order], cluster_rows = FALSE, cluster_cols = FALSE,
+         color = viridis(100), labels_row = genes, 
+         annotation_col = data.frame(row.names = colnames(for.plot)[ind_order],
                                      cell_type = cur_sce$cell_type[ind_order],
-                                     tissue = cur_sce$Tissue[ind_order]), 
+                                     tissue = cur_sce$Tissue[ind_order]),
          annotation_colors = list(cell_type = colour_vector,
-                                  tissue = metadata(sce)$colour_vector), 
-         clustering_method = "ward.D2")
+                                  tissue = metadata(cur_sce)$colour_vector),
+         show_colnames = FALSE)
 dev.off()
 ```
+
+# Calculate pseudotime for GC and BE
+
+Here, we compute the pseudotime for BE and GC to highlight the opposint HNF4 and MYC signalling.
+
+```{r}
+# Select GC
+cur_GC <- cur_sce[,cur_sce$Tissue == "GC"]
+cur_GC <- cur_GC[Matrix::rowMeans(counts(cur_GC)) > 0,]
+cur_GC <- normalize(cur_GC)
+
+# Pseudotime 
+pca_GC <- t(corrected[,cur_sce$Tissue == "GC"])
+rownames(pca_GC) <- paste(cur_GC$Tissue, cur_GC$Patient, cur_GC$Barcode, sep = "_") 
+colnames(pca_GC) <- paste("PC", seq(1,ncol(pca_GC)), sep = "")
+clusters <- cur_GC$cell_type
+names(clusters) <- rownames(pca_GC)
+pt_GC <- PT(rd = pca_GC[,1:3], clusters = clusters, 
+            col_vector = colour_vector[cur_GC$cell_type])
+
+# Visualize trajectory
+set.seed(12345)
+rand <- rnorm(n = ncol(cur_GC), mean = 0, sd = 0.1)
+GC.PT <- ggplot(data.frame(PT = pt_GC[,"lambda"],
+                  value = rand,
+                  cell_type = cur_GC$cell_type)) +
+  geom_point(aes(PT, value, fill = cell_type), shape = 21, size = 2) +
+  scale_fill_manual(values = colour_vector)
+
+cur_df <- data.frame(PT = pt_GC[,"lambda"],
+                  value = rand,
+                  MYC = logcounts(cur_GC)[rowData(cur_GC)$Symbol == "MYC",])
+GC_MYC <- ggplot() +
+  geom_point(data = cur_df[cur_df$MYC == 0,], 
+             aes(PT, value, colour = MYC), size = 2) +
+    geom_point(data = cur_df[cur_df$MYC > 0,], 
+             aes(PT, value, colour = MYC), size = 2) +
+  scale_colour_viridis(limits = c(0, 4.5))
+
+cur_df <- data.frame(PT = pt_GC[,"lambda"],
+                  value = rand,
+                  HNF4A = logcounts(cur_GC)[rowData(cur_GC)$Symbol == "HNF4A",])
+GC_HNF4A <- ggplot() +
+  geom_point(data = cur_df[cur_df$HNF4A == 0,], 
+             aes(PT, value, colour = HNF4A), size = 2) +
+    geom_point(data = cur_df[cur_df$HNF4A > 0,], 
+             aes(PT, value, colour = HNF4A), size = 2) +
+  scale_colour_viridis(limits = c(0, 4.5))
+
+ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/GC_pseudotime.pdf", 
+       plot = GC.PT, width = 7, height = 2)
+ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/GC_MYC.pdf", 
+       plot = GC_MYC, width = 7, height = 2)
+ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/GC_HNF4A.pdf", 
+       plot = GC_HNF4A, width = 7, height = 2)
+
+# Select BE
+cur_BE <- cur_sce[,cur_sce$Tissue == "BE"]
+cur_BE <- cur_BE[Matrix::rowMeans(counts(cur_BE)) > 0,]
+cur_BE <- normalize(cur_BE)
+
+# Pseudotime 
+pca_BE <- t(corrected[,cur_sce$Tissue == "BE"])
+rownames(pca_BE) <- paste(cur_BE$Tissue, cur_BE$Patient, cur_BE$Barcode, sep = "_") 
+colnames(pca_BE) <- paste("PC", seq(1,ncol(pca_BE)), sep = "")
+clusters <- cur_BE$cell_type
+names(clusters) <- rownames(pca_BE)
+pt_BE <- PT(rd = pca_BE[,1:3], clusters = clusters, 
+            col_vector = colour_vector[cur_BE$cell_type])
+
+# Visualize trajectory
+set.seed(12345)
+rand <- rnorm(n = ncol(cur_BE), mean = 0, sd = 0.1)
+BE.PT <- ggplot(data.frame(PT = pt_BE[,"lambda"],
+                  value = rand,
+                  cell_type = cur_BE$cell_type)) +
+  geom_point(aes(PT, value, fill = cell_type), shape = 21, size = 2) +
+  scale_fill_manual(values = colour_vector)
+
+cur_df <- data.frame(PT = pt_BE[,"lambda"],
+                  value = rand,
+                  MYC = logcounts(cur_BE)[rowData(cur_BE)$Symbol == "MYC",])
+BE_MYC <- ggplot() +
+  geom_point(data = cur_df[cur_df$MYC == 0,], 
+             aes(PT, value, colour = MYC), size = 2) +
+    geom_point(data = cur_df[cur_df$MYC > 0,], 
+             aes(PT, value, colour = MYC), size = 2) +
+  scale_colour_viridis(limits = c(0, 4.5))
+
+cur_df <- data.frame(PT = pt_BE[,"lambda"],
+                  value = rand,
+                  HNF4A = logcounts(cur_BE)[rowData(cur_BE)$Symbol == "HNF4A",])
+BE_HNF4A <- ggplot() +
+  geom_point(data = cur_df[cur_df$HNF4A == 0,], 
+             aes(PT, value, colour = HNF4A), size = 2) +
+    geom_point(data = cur_df[cur_df$HNF4A > 0,], 
+             aes(PT, value, colour = HNF4A), size = 2) +
+  scale_colour_viridis(limits = c(0, 4.5))
+
+ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_pseudotime.pdf", 
+       plot = BE.PT, width = 7, height = 2)
+ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_MYC.pdf", 
+       plot = BE_MYC, width = 7, height = 2)
+ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_HNF4A.pdf", 
+       plot = BE_HNF4A, width = 7, height = 2)
+
+```
+
+
 
