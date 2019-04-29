@@ -337,7 +337,7 @@ multi.DE <- function(sce, conditions, covariate, select.marker = TRUE, lfc, FDR)
     # Combine P values
     cur_df$Combined_PValue <- eval(parse(text = paste0("combinePValues(", 
                                               paste0("cur_p[,", 1:ncol(cur_p), "],", collapse = " "), 
-                                              " method = 'fisher')")))
+                                              " method = 'simes')")))
     cur_df$FDR <- p.adjust(cur_df$Combined_PValue, method = "fdr")
     
     # Add the gene names

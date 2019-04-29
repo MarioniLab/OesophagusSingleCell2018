@@ -86,9 +86,9 @@ cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
 DE.genes <- multi.DE(sce = cur_sce, 
                      conditions = cur_sce$cell_type,
                      covariate = cur_sce$Patient,
-                     select.marker = FALSE,
+                     select.marker = TRUE,
                      lfc = 0.5,
-                     FDR = 1)
+                     FDR = 0.1)
 
 # Save as table
 write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S3.xlsx")
