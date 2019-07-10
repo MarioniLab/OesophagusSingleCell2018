@@ -1,0 +1,136 @@
+---
+title: "Pairwise Tissue Batch correction"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/PairwiseMapping.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script performs batch correction between BE and all other tissues in a pairwise manner.
+
+```{r}
+library(scran)
+library(scater)
+library(DropletUtils)
+library(openxlsx)
+library(Rtsne)
+library(pheatmap)
+library(viridis)
+library(RColorBrewer)
+source("../../Analysis/Functions/auxiliary.R")
+
+# Read in the normalized and batch-corrected reads
+sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+```
+
+# BE and GC
+
+```{r}
+cur_sce <- sce[,sce$Tissue == "BE" | sce$Tissue == "GC"]
+
+# Split the SCE object into individual patients
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+
+# Perform batch correction
+corrected <- batch.correction(sce.list)
+
+# Merge sce objects
+cur_sce <- do.call("cbind", sce.list)
+
+set.seed(111)
+BE_GC_tsne <- Rtsne(t(corrected), pca = FALSE)
+
+ggplot(data.frame(tsne1 = BE_GC_tsne$Y[,1],
+                      tsne2 = BE_GC_tsne$Y[,2],
+                      cell_type = cur_sce$cell_type,
+                      tissue = cur_sce$Tissue)) + 
+  geom_point(aes(tsne1, tsne2, colour = interaction(cell_type, tissue))) + 
+  scale_color_manual(values = c(brewer.pal(9, "Set1"), brewer.pal(8, "Set3")))
+
+```
+
+# BE and D2
+
+```{r}
+cur_sce <- sce[,sce$Tissue == "BE" | sce$Tissue == "D2"]
+
+# Split the SCE object into individual patients
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+
+# Perform batch correction
+corrected <- batch.correction(sce.list)
+
+# Merge sce objects
+cur_sce <- do.call("cbind", sce.list)
+
+set.seed(111)
+BE_D2_tsne <- Rtsne(t(corrected), pca = FALSE)
+
+ggplot(data.frame(tsne1 = BE_D2_tsne$Y[,1],
+                      tsne2 = BE_D2_tsne$Y[,2],
+                      cell_type = cur_sce$cell_type,
+                      tissue = cur_sce$Tissue)) + 
+  geom_point(aes(tsne1, tsne2, colour = interaction(cell_type, tissue))) + 
+  scale_color_manual(values = c(brewer.pal(9, "Set1"), brewer.pal(8, "Set3")))
+
+```
+
+# BE and SMG
+
+```{r}
+cur_sce <- sce[,sce$Tissue == "BE" | sce$Tissue == "SMG"]
+
+# Split the SCE object into individual patients
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+
+# Perform batch correction
+corrected <- batch.correction(sce.list)
+
+# Merge sce objects
+cur_sce <- do.call("cbind", sce.list)
+
+set.seed(111)
+BE_SMG_tsne <- Rtsne(t(corrected), pca = FALSE)
+
+ggplot(data.frame(tsne1 = BE_SMG_tsne$Y[,1],
+                      tsne2 = BE_SMG_tsne$Y[,2],
+                      cell_type = cur_sce$cell_type,
+                      tissue = cur_sce$Tissue)) + 
+  geom_point(aes(tsne1, tsne2, colour = interaction(cell_type, tissue))) + 
+  scale_color_manual(values = c(brewer.pal(9, "Set1"), brewer.pal(8, "Set3")))
+
+```
+
+# BE and NE
+
+```{r}
+cur_sce <- sce[,sce$Tissue == "BE" | sce$Tissue == "NE"]
+
+# Split the SCE object into individual patients
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+
+# Perform batch correction
+corrected <- batch.correction(sce.list)
+
+# Merge sce objects
+cur_sce <- do.call("cbind", sce.list)
+
+set.seed(111)
+BE_NE_tsne <- Rtsne(t(corrected), pca = FALSE)
+
+ggplot(data.frame(tsne1 = BE_NE_tsne$Y[,1],
+                      tsne2 = BE_NE_tsne$Y[,2],
+                      cell_type = cur_sce$cell_type,
+                      tissue = cur_sce$Tissue)) + 
+  geom_point(aes(tsne1, tsne2, colour = interaction(cell_type, tissue))) + 
+  scale_color_manual(values = c(brewer.pal(9, "Set1"), brewer.pal(8, "Set3")))
+
+```
