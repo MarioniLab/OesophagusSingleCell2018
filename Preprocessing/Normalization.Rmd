@@ -22,6 +22,8 @@ library(scater)
 ```
 
 We use the filtered data to perform normalization.
+Here, raw counts are normalized within each batch, which is important for batch correction. 
+To visualize counts across batches, we normalize raw counts across the selected cells.
 
 ```{r data, eval=FALSE}
 sce.list <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")

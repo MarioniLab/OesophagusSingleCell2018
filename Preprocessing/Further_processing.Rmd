@@ -23,7 +23,8 @@ library(openxlsx)
 source("../Analysis/Functions/auxiliary.R")
 ```
 
-Here, we compute tSNEs, perform clustering and detect marker genes
+Here, we compute tSNEs, perform clustering and detect marker genes.
+This is done for each sample idenpendently to identify the captured cell types.
 
 ```{r data, eval=FALSE}
 sce.list <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
@@ -78,6 +79,8 @@ saveRDS(sce.list, "../../../Dropbox (Cambridge University)/Oesophagus_single_cel
 # Removing lower quality libraries
 
 For further downstream analysis, we exclude lower quality samples.
+Samples are exluded based on manual examination of sample quality. 
+Here, we retain at least three samples per tissue type.
 
 ```{r exclude-samples}
 QC <- read.xlsx("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/Library_quality.xlsx")
