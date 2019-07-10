@@ -52,35 +52,35 @@ HVG <- function(sce, numberGenes = 1000){
 
 #### Clustering
 # Perform clustering using dynamic tree cut
-DTC <- function(sce, HVG.genes, minClusterSize = 10, deepSplit = 0){
-  if(typeof(sce) == "S4"){
-    dist.all <- as.dist(sqrt((1 - cor(as.matrix(logcounts(sce)[HVG.genes,]), 
-                                      method = "spearman"))/2))
-    
-    dendro <- hclust(dist.all, method = "ward.D2")
-    
-    ct <- as.character(cutreeDynamic(dendro = dendro, distM = as.matrix(dist.all), 
-                        minClusterSize = minClusterSize, deepSplit = deepSplit))
-  }
-  else {
-    out <- list()
-    for(i in 1:length(sce)){
-      dist.all <- as.dist(sqrt((1 - cor(as.matrix(logcounts(sce[[i]])[HVG.genes[[i]],]), 
-                                        method = "spearman"))/2))
-      
-      dendro <- hclust(dist.all, method = "ward.D2")
-      
-      cur_clusters <- paste(names(sce)[i], as.character(cutreeDynamic(dendro = dendro, 
-                                                      distM = as.matrix(dist.all), 
-                minClusterSize = minClusterSize, deepSplit = deepSplit)), sep = "_")
-      names(cur_clusters) <- colData(sce[[i]])$Barcode
-      
-      out[[names(sce)[i]]] <- cur_clusters
-    }
-    names(out) <- names(sce)
-    out
-  }
-}
+#DTC <- function(sce, HVG.genes, minClusterSize = 10, deepSplit = 0){
+#  if(typeof(sce) == "S4"){
+#    dist.all <- as.dist(sqrt((1 - cor(as.matrix(logcounts(sce)[HVG.genes,]), 
+#                                      method = "spearman"))/2))
+#    
+#    dendro <- hclust(dist.all, method = "ward.D2")
+#    
+#    ct <- as.character(cutreeDynamic(dendro = dendro, distM = as.matrix(dist.all), 
+#                        minClusterSize = minClusterSize, deepSplit = deepSplit))
+#  }
+#  else {
+#    out <- list()
+#    for(i in 1:length(sce)){
+#      dist.all <- as.dist(sqrt((1 - cor(as.matrix(logcounts(sce[[i]])[HVG.genes[[i]],]), 
+#                                        method = "spearman"))/2))
+#      
+#      dendro <- hclust(dist.all, method = "ward.D2")
+#      
+#      cur_clusters <- paste(names(sce)[i], as.character(cutreeDynamic(dendro = dendro, 
+#                                                      distM = as.matrix(dist.all), 
+#                minClusterSize = minClusterSize, deepSplit = deepSplit)), sep = "_")
+#      names(cur_clusters) <- colData(sce[[i]])$Barcode
+#      
+#      out[[names(sce)[i]]] <- cur_clusters
+#    }
+#    names(out) <- names(sce)
+#    out
+#  }
+#}
 
 #### Find specifc marker genes
 marker.detection <- function(sce, clusters){
@@ -90,7 +90,7 @@ marker.detection <- function(sce, clusters){
   # Collect group specific markers
   markers.spec <- lapply(cur_markers, function(n){
     if(!is.na(n$Top[1])){
-    cur_n <- n[n$FDR < 0.1 & apply(n[,3:ncol(n)], 1, function(x){sum(x > 0)}) == ncol(n) - 2,]
+    cur_n <- n[n$FDR < 0.1 & apply(n[,4:ncol(n)], 1, function(x){sum(x > 0)}) == ncol(n) - 3,]
       if(nrow(cur_n) > 0){
         cur_n$GeneName <- rowData(sce)$Symbol[match(rownames(cur_n), rowData(sce)$ID)]
       }
@@ -104,29 +104,29 @@ marker.detection <- function(sce, clusters){
 }
 
 #### Compute pseudotime with destiny
-diffusionPT <- function(sce, HVG, clusters, col_vector,
-               exclude = NULL){
-  if(!is.null(exclude)){
-    dm <- DiffusionMap(t(as.matrix(logcounts(sce)[HVG,!exclude])), k = 20)
-    
-    plot(dm, col = col_vector[clusters[!exclude]], 
-         pch = 16, type = "p")
-    
-    dpt <- DPT(dm = dm)
-    
-    dpt$DPT1
-  }
-  else{
-    dm <- DiffusionMap(t(as.matrix(logcounts(sce)[HVG,])), k = 20)
-    
-    plot(dm, col = col_vector[clusters], 
-         pch = 16, type = "p")
-    
-    dpt <- DPT(dm = dm)
-    
-    dpt$DPT1
-  }
-}
+#diffusionPT <- function(sce, HVG, clusters, col_vector,
+#               exclude = NULL){
+#  if(!is.null(exclude)){
+#    dm <- DiffusionMap(t(as.matrix(logcounts(sce)[HVG,!exclude])), k = 20)
+#    
+#    plot(dm, col = col_vector[clusters[!exclude]], 
+#         pch = 16, type = "p")
+#    
+#    dpt <- DPT(dm = dm)
+#    
+#    dpt$DPT1
+#  }
+#  else{
+#    dm <- DiffusionMap(t(as.matrix(logcounts(sce)[HVG,])), k = 20)
+#    
+#    plot(dm, col = col_vector[clusters], 
+#         pch = 16, type = "p")
+#    
+#    dpt <- DPT(dm = dm)
+#    
+#    dpt$DPT1
+#  }
+#}
 
 #### Compute pseudorank
 PT <- function(rd, clusters, col_vector, 
@@ -277,6 +277,9 @@ multi.DE <- function(sce, conditions, covariate, select.marker = TRUE, lfc, FDR)
                     nrow = nrow(cur_sce))
       rownames(mat) <- rownames(counts(cur_sce))
       colnames(mat) <- unique(paste(cur_covariate, cur_conditions, sep = " "))
+      
+      # Print the number of samples on each side
+      print(colnames(mat))
       
       for(k in colnames(mat)){
         cur_cov <- unlist(strsplit(k, " "))[1]
