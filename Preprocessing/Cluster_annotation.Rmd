@@ -73,7 +73,7 @@ colour_vector["D2"] <- "#3C5488FF"
 colour_vector["SMG"] <- "#B09C85FF"
 
 # Recompute tsne for visualization
-set.seed(12345)
+set.seed(1234)
 tsne <- Rtsne(t(metadata(sce)$corrected), pca = FALSE, perplexity = 100)
   
 # Store tsne in slot
