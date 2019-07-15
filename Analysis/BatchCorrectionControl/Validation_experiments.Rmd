@@ -1,0 +1,100 @@
+---
+title: "Validation of batch correction"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Reports/Batch_correction_validation.html') })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Read in the data
+
+```{r libraries, message=FALSE}
+library(scran)
+library(scater)
+library(DropletUtils)
+library(openxlsx)
+library(Rtsne)
+source("../../Analysis/Functions/auxiliary.R")
+```
+
+# Batch correction across tissues
+
+```{r batch-correction}
+sce.list <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/High_quality_sce.rds")
+
+sce.list <- lapply(sce.list, function(n){
+    rowData(n) <- rowData(n)[,1:3]
+    n
+  })
+
+# Order sce objects for batch correction
+order.names <- c("Patient2_SIGAD9_GOJ", "Patient8_SIGAE7_GOJ", 
+                 "Patient10_SIGAB5_GOJ", "Patient13_SIGAD8_GOJ", "Patient3_SIGAB5_SCJ", "Patient7_SIGAB4_SCJ", 
+                 "Patient9_SIGAE9_SCJ", "Patient10_SIGAA5_NE", "Patient2_SIGAC9_NE", "Patient7_SIGAA4_NE",
+                 "Patient8_SIGAD7_NE", "Patient2_SIGAE9_GC", "Patient3_SIGAD5_GC", "Patient13_SIGAE8_GC",
+                 "Patient7_SIGAD4_GC", "Patient3_SIGAC5_BE",
+                 "Patient7_SIGAC4_BE", "Patient9_SIGAF9_BE",
+                 "Patient7_SIGAE4_D2", "Patient8_SIGAG7_D2", "Patient9_SIGAH9_D2",
+                 "Patient12_SIGAE3_D2", "Patient10_SIGAD5_SMG", "Patient11_SIGAA4_SMG",
+                 "Patient13_SIGAC8_SMG")
+
+sce.list <- sce.list[order.names]
+
+# Combine sce objects
+sce <- do.call("cbind", sce.list)
+  
+# Batch correction
+corrected_1 <- batch.correction(sce.list, number.HVG = 500)
+corrected_2 <- batch.correction(sce.list, number.HVG = 2000)
+
+# Compute tsne on corrected counts
+set.seed(1234)
+tsne_1 <- Rtsne(t(corrected_1), pca = FALSE)
+tsne_2 <- Rtsne(t(corrected_2), pca = FALSE)
+
+ggplot(data.frame(tSNE1 = tsne_1$Y[,1],
+                  tSNE2 = tsne_1$Y[,2],
+                  clusters = as.factor(colData(sce)$Tissue))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = clusters))
+
+ggplot(data.frame(tSNE1 = tsne_2$Y[,1],
+                  tSNE2 = tsne_2$Y[,2],
+                  clusters = as.factor(colData(sce)$Tissue))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = clusters))
+
+
+# dendogram analysis
+clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
+mat_1 <- mat_2 <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(corrected_1))
+colnames(mat_1) <- colnames(mat_2) <- unique(clusters)
+
+for(i in unique(clusters)){
+  mat_1[,i] <- rowMeans(corrected_1[,clusters == i])
+  mat_2[,i] <- rowMeans(corrected_2[,clusters == i])
+}
+
+# Rename the matrix to contain the actual cell-type labels
+for(i in 1:ncol(mat)){
+  colnames(mat_1)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat_1)[i]) &
+                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat_1)[i])])
+  colnames(mat_2)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat_2)[i]) &
+                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat_2)[i])])
+}
+
+# Calculate euclidean distance on corrected counts
+dend_1 <- hclust(dist(t(mat_1), method = "euclidean"), method = "ward.D2")
+dend_2 <- hclust(dist(t(mat_2), method = "euclidean"), method = "ward.D2")
+plot(as.phylo(dend_1), type = "fan", 
+     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+plot(as.phylo(dend_2), type = "fan", 
+     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+```
+
