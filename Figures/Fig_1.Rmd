@@ -104,7 +104,7 @@ markers <- marker.detection(cur_sce, clusters = cur_sce$cell_type)
 # Visualize gene expression for control
 ggplot(data.frame(tsne1 = smg_tsne$Y[,1],
                   tsne2 = smg_tsne$Y[,2],
-                  gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "BPIFB2",])) + 
+                  gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "CASC8",])) + 
   geom_point(aes(tsne1, tsne2, colour = gene)) +
   scale_colour_viridis()
 
@@ -123,9 +123,9 @@ clusters <- quickCluster(cur_sce, method = "igraph", irlba.args = c("work" = 100
 cur_sce <- computeSumFactors(cur_sce, clusters=clusters)
 cur_sce <- normalize(cur_sce, return_log = TRUE)
 
-genes <- c("KRT7", "TFF3", "MUC5B", "KRT8", "CDH1", "SLPI", 
-           "ACTA2", "MMP7", "SOX9", "MKI67", "KRT23", "KRT14",
-           "OLFM4", "KRT5", "AGR2")
+genes <- c("CDH1", "TFF3", "MUC5B", "AGR2", "KRT8", "SLPI", 
+           "MMP7", "KRT7", "SOX9", "KRT23", "ACTA2", "KRT5",
+           "MKI67", "OLFM4")
 
 # Remove somatic cells
 cur_corrected <- corrected[,cur_sce$cell_type %in% 
