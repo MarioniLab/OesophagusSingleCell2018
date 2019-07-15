@@ -28,28 +28,12 @@ source("../../Analysis/Functions/auxiliary.R")
 # Batch correction across tissues
 
 ```{r batch-correction}
-sce.list <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/High_quality_sce.rds")
-
-sce.list <- lapply(sce.list, function(n){
-    rowData(n) <- rowData(n)[,1:3]
-    n
-  })
-
-# Order sce objects for batch correction
-order.names <- c("Patient2_SIGAD9_GOJ", "Patient8_SIGAE7_GOJ", 
-                 "Patient10_SIGAB5_GOJ", "Patient13_SIGAD8_GOJ", "Patient3_SIGAB5_SCJ", "Patient7_SIGAB4_SCJ", 
-                 "Patient9_SIGAE9_SCJ", "Patient10_SIGAA5_NE", "Patient2_SIGAC9_NE", "Patient7_SIGAA4_NE",
-                 "Patient8_SIGAD7_NE", "Patient2_SIGAE9_GC", "Patient3_SIGAD5_GC", "Patient13_SIGAE8_GC",
-                 "Patient7_SIGAD4_GC", "Patient3_SIGAC5_BE",
-                 "Patient7_SIGAC4_BE", "Patient9_SIGAF9_BE",
-                 "Patient7_SIGAE4_D2", "Patient8_SIGAG7_D2", "Patient9_SIGAH9_D2",
-                 "Patient12_SIGAE3_D2", "Patient10_SIGAD5_SMG", "Patient11_SIGAA4_SMG",
-                 "Patient13_SIGAC8_SMG")
-
-sce.list <- sce.list[order.names]
+all_sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+all_sce <- all_sce[,all_sce$include]
+sce.list <- split.sce(sce = all_sce, groups = unique(all_sce$Sample), colData.name = "Sample")
 
 # Combine sce objects
-sce <- do.call("cbind", sce.list)
+all_sce <- do.call("cbind", sce.list)
   
 # Batch correction
 corrected_1 <- batch.correction(sce.list, number.HVG = 500)
@@ -63,12 +47,14 @@ tsne_2 <- Rtsne(t(corrected_2), pca = FALSE)
 ggplot(data.frame(tSNE1 = tsne_1$Y[,1],
                   tSNE2 = tsne_1$Y[,2],
                   clusters = as.factor(colData(sce)$Tissue))) + 
-  geom_point(aes(tSNE1, tSNE2, colour = clusters))
+  geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
+  scale_colour_manual(values = metadata(all_sce)$colour_vector)
 
 ggplot(data.frame(tSNE1 = tsne_2$Y[,1],
                   tSNE2 = tsne_2$Y[,2],
                   clusters = as.factor(colData(sce)$Tissue))) + 
-  geom_point(aes(tSNE1, tSNE2, colour = clusters))
+  geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
+  scale_colour_manual(values = metadata(all_sce)$colour_vector)
 
 
 # dendogram analysis
