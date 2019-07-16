@@ -22,10 +22,13 @@ library(scater)
 library(DropletUtils)
 library(openxlsx)
 library(Rtsne)
+library(ape)
 source("../../Analysis/Functions/auxiliary.R")
 ```
 
 # Batch correction across tissues
+
+Here, I will use different sets of genes to show that the batch correction is independent from the chosen gene set.
 
 ```{r batch-correction}
 all_sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
@@ -44,21 +47,24 @@ set.seed(1234)
 tsne_1 <- Rtsne(t(corrected_1), pca = FALSE)
 tsne_2 <- Rtsne(t(corrected_2), pca = FALSE)
 
-ggplot(data.frame(tSNE1 = tsne_1$Y[,1],
+p.tsne.500 <- ggplot(data.frame(tSNE1 = tsne_1$Y[,1],
                   tSNE2 = tsne_1$Y[,2],
-                  clusters = as.factor(colData(sce)$Tissue))) + 
+                  clusters = as.factor(colData(all_sce)$Tissue))) + 
   geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
   scale_colour_manual(values = metadata(all_sce)$colour_vector)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/BatchCorrectionValidation/tsne_500HVG.pdf", 
+       p.tsne.500, width = 12, height = 7)
 
-ggplot(data.frame(tSNE1 = tsne_2$Y[,1],
+p.tsne.2000 <- ggplot(data.frame(tSNE1 = tsne_2$Y[,1],
                   tSNE2 = tsne_2$Y[,2],
-                  clusters = as.factor(colData(sce)$Tissue))) + 
+                  clusters = as.factor(colData(all_sce)$Tissue))) + 
   geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
   scale_colour_manual(values = metadata(all_sce)$colour_vector)
-
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/BatchCorrectionValidation/tsne_2000HVG.pdf", 
+       p.tsne.2000, width = 12, height = 7)
 
 # dendogram analysis
-clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
+clusters <- paste(colData(all_sce)$Tissue, colData(all_sce)$Tissue_cluster, sep = "_")
 mat_1 <- mat_2 <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(corrected_1))
 colnames(mat_1) <- colnames(mat_2) <- unique(clusters)
 
@@ -68,19 +74,41 @@ for(i in unique(clusters)){
 }
 
 # Rename the matrix to contain the actual cell-type labels
-for(i in 1:ncol(mat)){
-  colnames(mat_1)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat_1)[i]) &
-                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat_1)[i])])
-  colnames(mat_2)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat_2)[i]) &
-                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat_2)[i])])
+for(i in 1:ncol(mat_1)){
+  colnames(mat_1)[i] <- unique(all_sce$cell_type[all_sce$Tissue == sub("_[0-9]*$", "", colnames(mat_1)[i]) &
+                                 all_sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat_1)[i])])
+  colnames(mat_2)[i] <- unique(all_sce$cell_type[all_sce$Tissue == sub("_[0-9]*$", "", colnames(mat_2)[i]) &
+                                 all_sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat_2)[i])])
 }
 
 # Calculate euclidean distance on corrected counts
 dend_1 <- hclust(dist(t(mat_1), method = "euclidean"), method = "ward.D2")
 dend_2 <- hclust(dist(t(mat_2), method = "euclidean"), method = "ward.D2")
+pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/BatchCorrectionValidation/Tree_500HVG.pdf", width = 10, height = 10)
 plot(as.phylo(dend_1), type = "fan", 
-     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+     tip.color = metadata(all_sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+dev.off()
+pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/BatchCorrectionValidation/Tree_2000HVG.pdf", width = 10, height = 10)
 plot(as.phylo(dend_2), type = "fan", 
-     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+     tip.color = metadata(all_sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+dev.off()
+```
+
+I will next use the genes that are expressed in all samples.
+
+```{r}
+# Select the set of genes that are expressed in each sample
+genes <- rownames(sce.list[[1]])[rowMeans(counts(sce.list[[1]])) > 0]
+
+for(i in 2:length(sce.list)){
+  genes <- intersect(genes, rownames(sce.list[[i]])[rowMeans(counts(sce.list[[i]])) > 0])
+}
+
+# Batch correction
+func <- paste0("fastMNN(", 
+                   paste0("as.matrix(logcounts(sce.list[[", 1:length(sce.list), "]])[genes,])", collapse=", "), 
+                   ")")
+corrected_3 <- eval( parse(text=func) )
+corrected_3 <- t(corrected_3$corrected)
 ```
 
