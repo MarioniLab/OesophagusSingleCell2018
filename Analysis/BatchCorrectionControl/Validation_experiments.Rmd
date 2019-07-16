@@ -94,21 +94,9 @@ plot(as.phylo(dend_2), type = "fan",
 dev.off()
 ```
 
-I will next use the genes that are expressed in all samples.
+Next, I will use scanorama and Seurat to perform the same mapping strategy.
 
 ```{r}
-# Select the set of genes that are expressed in each sample
-genes <- rownames(sce.list[[1]])[rowMeans(counts(sce.list[[1]])) > 0]
 
-for(i in 2:length(sce.list)){
-  genes <- intersect(genes, rownames(sce.list[[i]])[rowMeans(counts(sce.list[[i]])) > 0])
-}
 
-# Batch correction
-func <- paste0("fastMNN(", 
-                   paste0("as.matrix(logcounts(sce.list[[", 1:length(sce.list), "]])[genes,])", collapse=", "), 
-                   ")")
-corrected_3 <- eval( parse(text=func) )
-corrected_3 <- t(corrected_3$corrected)
 ```
-
