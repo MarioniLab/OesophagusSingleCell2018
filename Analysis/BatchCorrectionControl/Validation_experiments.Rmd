@@ -95,8 +95,103 @@ dev.off()
 ```
 
 Next, I will use scanorama and Seurat to perform the same mapping strategy.
+Start with scanorama.
 
 ```{r}
+library(reticulate)
+scanorama <- import('scanorama')
+
+# List of genes
+HVG.genes <- lapply(sce.list, function(n){
+    HVG <- trendVar(n, use.spikes = FALSE)
+    decomposeVar(n, HVG)
+})
+  
+HVG.df <- do.call("combineVar", HVG.genes)
+HVG.df <- HVG.df[order(HVG.df$bio, decreasing = TRUE),]
+genes <- rownames(HVG.df)[1:1000]
+l.genes <- list()
+for(i in 1:length(datasets)){l.genes[[i]] <- genes}
 
 
+# List of normalized count matrices
+datasets <- lapply(sce.list, function(n){
+  t(as.matrix(logcounts(n)[genes,]))
+})
+
+# Data integration
+integrated.data <- scanorama$integrate(datasets, l.genes)
 ```
+
+This doesn't seem to work.
+So I'll try the Seurat implementation instead.
+
+```{r}
+library(Seurat)
+
+# List of highly variable genes
+# List of genes
+HVG.genes <- lapply(sce.list, function(n){
+    HVG <- trendVar(n, use.spikes = FALSE)
+    decomposeVar(n, HVG)
+})
+  
+HVG.df <- do.call("combineVar", HVG.genes)
+HVG.df <- HVG.df[order(HVG.df$bio, decreasing = TRUE),]
+genes <- rownames(HVG.df)[1:1000]
+
+# SCE to Seurat objects
+sce.list.seurat <- lapply(sce.list, function(n){
+  as.Seurat(n, counts = "counts", data = "logcounts")
+})
+
+# Normalize and find variable features for each sample
+#for (i in 1:length(sce.list.seurat)) {
+#    sce.list.seurat[[i]] <- NormalizeData(sce.list.seurat[[i]], verbose = FALSE)
+#    sce.list.seurat[[i]] <- FindVariableFeatures(sce.list.seurat[[i]], selection.method = "vst", 
+#        nfeatures = 1000, verbose = FALSE)
+#}
+
+# Find anchors
+anchors <- FindIntegrationAnchors(object.list = sce.list.seurat, dims = 1:30, 
+                                  k.filter = 30, anchor.features = genes)
+
+# Integration
+integrated <- IntegrateData(anchorset = anchors, dims = 1:30)
+
+# Visualization
+DefaultAssay(integrated) <- "integrated"
+integrated <- ScaleData(integrated, verbose = FALSE)
+integrated <- RunPCA(integrated, npcs = 30, verbose = FALSE)
+integrated <- RunTSNE(integrated, verbose = FALSE)
+
+p.tsne.seurat <- ggplot(data.frame(tSNE1 = integrated@reductions$tsne@cell.embeddings[,1],
+                  tSNE2 = integrated@reductions$tsne@cell.embeddings[,2],
+                  clusters = as.factor(integrated@meta.data$Tissue))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
+  scale_colour_manual(values = metadata(all_sce)$colour_vector)
+
+# We now remove the SMG cells and run the pipeline with default values
+sce.list.seurat <- sce.list.seurat[!grepl("SMG", names(sce.list.seurat))]
+
+anchors <- FindIntegrationAnchors(object.list = sce.list.seurat, dims = 1:30, anchor.features = genes)
+
+# Integration
+integrated.2 <- IntegrateData(anchorset = anchors, dims = 1:30)
+
+# Visualization
+DefaultAssay(integrated) <- "integrated"
+integrated <- ScaleData(integrated, verbose = FALSE)
+integrated <- RunPCA(integrated, npcs = 30, verbose = FALSE)
+integrated <- RunTSNE(integrated, verbose = FALSE)
+
+p.tsne.seurat <- ggplot(data.frame(tSNE1 = integrated@reductions$tsne@cell.embeddings[,1],
+                  tSNE2 = integrated@reductions$tsne@cell.embeddings[,2],
+                  clusters = as.factor(integrated@meta.data$Tissue))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
+  scale_colour_manual(values = metadata(all_sce)$colour_vector)
+```
+
+Next we will try scmap.
+
+Next, we will try harmony.
