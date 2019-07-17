@@ -165,11 +165,13 @@ integrated <- ScaleData(integrated, verbose = FALSE)
 integrated <- RunPCA(integrated, npcs = 30, verbose = FALSE)
 integrated <- RunTSNE(integrated, verbose = FALSE)
 
-p.tsne.seurat <- ggplot(data.frame(tSNE1 = integrated@reductions$tsne@cell.embeddings[,1],
+p.tsne.seurat.1 <- ggplot(data.frame(tSNE1 = integrated@reductions$tsne@cell.embeddings[,1],
                   tSNE2 = integrated@reductions$tsne@cell.embeddings[,2],
                   clusters = as.factor(integrated@meta.data$Tissue))) + 
   geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
   scale_colour_manual(values = metadata(all_sce)$colour_vector)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/BatchCorrectionValidation/tsne_Seurat.wSMG.k30.pdf", 
+       p.tsne.seurat.1, width = 12, height = 7)
 
 # We now remove the SMG cells and run the pipeline with default values
 sce.list.seurat <- sce.list.seurat[!grepl("SMG", names(sce.list.seurat))]
@@ -177,7 +179,7 @@ sce.list.seurat <- sce.list.seurat[!grepl("SMG", names(sce.list.seurat))]
 anchors <- FindIntegrationAnchors(object.list = sce.list.seurat, dims = 1:30, anchor.features = genes)
 
 # Integration
-integrated.2 <- IntegrateData(anchorset = anchors, dims = 1:30)
+integrated <- IntegrateData(anchorset = anchors, dims = 1:30)
 
 # Visualization
 DefaultAssay(integrated) <- "integrated"
@@ -185,11 +187,38 @@ integrated <- ScaleData(integrated, verbose = FALSE)
 integrated <- RunPCA(integrated, npcs = 30, verbose = FALSE)
 integrated <- RunTSNE(integrated, verbose = FALSE)
 
-p.tsne.seurat <- ggplot(data.frame(tSNE1 = integrated@reductions$tsne@cell.embeddings[,1],
+p.tsne.seurat.2 <- ggplot(data.frame(tSNE1 = integrated@reductions$tsne@cell.embeddings[,1],
                   tSNE2 = integrated@reductions$tsne@cell.embeddings[,2],
                   clusters = as.factor(integrated@meta.data$Tissue))) + 
   geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
   scale_colour_manual(values = metadata(all_sce)$colour_vector)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/BatchCorrectionValidation/tsne_Seurat.woSMG.defaults.pdf", 
+       p.tsne.seurat.2, width = 12, height = 7)
+
+# Now with the Seurat normalization and feature selection
+for (i in 1:length(sce.list.seurat)) {
+    sce.list.seurat[[i]] <- NormalizeData(sce.list.seurat[[i]], verbose = FALSE)
+    sce.list.seurat[[i]] <- FindVariableFeatures(sce.list.seurat[[i]], selection.method = "vst", 
+        nfeatures = 1000, verbose = FALSE)
+}
+
+anchors <- FindIntegrationAnchors(object.list = sce.list.seurat, dims = 1:30)
+
+# Integration
+integrated <- IntegrateData(anchorset = anchors, dims = 1:30)
+
+# Visualization
+DefaultAssay(integrated) <- "integrated"
+integrated <- ScaleData(integrated, verbose = FALSE)
+integrated <- RunPCA(integrated, npcs = 30, verbose = FALSE)
+integrated <- RunTSNE(integrated, verbose = FALSE)
+
+p.tsne.seurat.3 <- ggplot(data.frame(tSNE1 = integrated@reductions$tsne@cell.embeddings[,1],
+                  tSNE2 = integrated@reductions$tsne@cell.embeddings[,2],
+                  clusters = as.factor(integrated@meta.data$Tissue))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
+  scale_colour_manual(values = metadata(all_sce)$colour_vector)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/BatchCorrectionValidation/tsne_Seurat.woSMG.defaults.SeuratNormHVG.pdf", p.tsne.seurat.3, width = 12, height = 7)
 ```
 
 Next we will try scmap.
