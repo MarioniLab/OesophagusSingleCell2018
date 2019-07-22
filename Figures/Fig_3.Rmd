@@ -128,6 +128,8 @@ GC_Undiff_vs_Diff.out <- rbind(GC_Undiff_vs_Diff$Undifferentiated,
                                GC_Undiff_vs_Diff$Foveolar_differentiated[
               seq(nrow(GC_Undiff_vs_Diff$Foveolar_differentiated), 1),])
 
+GC_Undiff_vs_Diff.out$ID <- rownames(GC_Undiff_vs_Diff.out)
+
 GC_Undiff_vs_Diff.out$specificity <- NA
 GC_Undiff_vs_Diff.out$specificity[GC_Undiff_vs_Diff.out$logFC < 0 & GC_Undiff_vs_Diff.out$FDR <= 0.1] <- "Undifferentiated"
 GC_Undiff_vs_Diff.out$specificity[GC_Undiff_vs_Diff.out$logFC > 0 & GC_Undiff_vs_Diff.out$FDR <= 0.1] <- "Foveolar_differentiated"
@@ -143,6 +145,8 @@ BE_Undiff_vs_Diff <- DE.edgeR(sce_test, conditions = sce_test$cell_type,
 BE_Undiff_vs_Diff.out <- rbind(BE_Undiff_vs_Diff$Undifferentiated,
                                BE_Undiff_vs_Diff$Foveolar_differentiated[
               seq(nrow(BE_Undiff_vs_Diff$Foveolar_differentiated), 1),])
+
+BE_Undiff_vs_Diff.out$ID <- rownames(BE_Undiff_vs_Diff.out)
 
 BE_Undiff_vs_Diff.out$specificity <- NA
 BE_Undiff_vs_Diff.out$specificity[BE_Undiff_vs_Diff.out$logFC < 0 & BE_Undiff_vs_Diff.out$FDR <= 0.1] <- "Undifferentiated"
@@ -160,6 +164,8 @@ Undiff_BE_vs_GC.out <- rbind(Undiff_BE_vs_GC$GC,
                                Undiff_BE_vs_GC$BE[
               seq(nrow(Undiff_BE_vs_GC$BE), 1),])
 
+Undiff_BE_vs_GC.out$ID <- rownames(Undiff_BE_vs_GC.out)
+
 Undiff_BE_vs_GC.out$specificity <- NA
 Undiff_BE_vs_GC.out$specificity[Undiff_BE_vs_GC.out$logFC < 0 & Undiff_BE_vs_GC.out$FDR <= 0.1] <- "GC"
 Undiff_BE_vs_GC.out$specificity[Undiff_BE_vs_GC.out$logFC > 0 & Undiff_BE_vs_GC.out$FDR <= 0.1] <- "BE"
@@ -176,6 +182,8 @@ Diff_BE_vs_GC.out <- rbind(Diff_BE_vs_GC$GC,
                                Diff_BE_vs_GC$BE[
               seq(nrow(Diff_BE_vs_GC$BE), 1),])
 
+Diff_BE_vs_GC.out$ID <- rownames(Diff_BE_vs_GC.out)
+
 Diff_BE_vs_GC.out$specificity <- NA
 Diff_BE_vs_GC.out$specificity[Diff_BE_vs_GC.out$logFC < 0 & Diff_BE_vs_GC.out$FDR <= 0.1] <- "GC"
 Diff_BE_vs_GC.out$specificity[Diff_BE_vs_GC.out$logFC > 0 & Diff_BE_vs_GC.out$FDR <= 0.1] <- "BE"
@@ -184,7 +192,6 @@ out$Diff_BE_vs_GC <- Diff_BE_vs_GC.out
 
 
 # Visualize genes 
-# Just the raw counts to check if DE worked
 cur_tab <- out$Diff_BE_vs_GC
 cur_mat <- logcounts(cur_sce)[c(rownames(cur_tab)[1:20], rownames(cur_tab)[(nrow(cur_tab)-20):nrow(cur_tab)]),]
 colnames(cur_mat) <- paste(cur_sce$Barcode, cur_sce$Patient)
@@ -195,6 +202,8 @@ pheatmap(cur_mat,
                                      tissue = cur_sce$Tissue),
          show_colnames = FALSE, gaps_row = 20)
 
+# Save results
+write.xlsx(out, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S7.xlsx")
 ```
 
 
@@ -204,136 +213,87 @@ pheatmap(cur_mat,
 # We then remove unecessary columns and add the comparison between undiff and diff
 
 # List to save results
-out <- list()
+out_spec <- list()
 
 # Undifferentiated
 # GC specific
-GC_undiff <- Undiff_BE_vs_GC$GC[
-  match(intersect(GC_Undiff_vs_Diff$Undifferentiated$Genename,
-                  Undiff_BE_vs_GC$GC$Genename),
-        Undiff_BE_vs_GC$GC$Genename),]
-GC_undiff <- GC_undiff[order(GC_undiff$FDR, decreasing = FALSE),]
+cur_1 <- out$GC_Undiff_vs_Diff[out$GC_Undiff_vs_Diff$specificity == "Undifferentiated" &
+                                 !is.na(out$GC_Undiff_vs_Diff$specificity),]
+cur_2 <- out$Undiff_BE_vs_GC[out$Undiff_BE_vs_GC$specificity == "GC" &
+                               !is.na(out$Undiff_BE_vs_GC$specificity),]
+shared.genes <- intersect(rownames(cur_1), rownames(cur_2))
+GC_undiff <- cbind(out$GC_Undiff_vs_Diff[shared.genes,], out$Undiff_BE_vs_GC[shared.genes,])
+GC_undiff <- GC_undiff[,c(1,5,9,13,14,15)]
 
-GC_undiff <- GC_undiff[,c(1,5)]
-GC_undiff <- cbind(GC_undiff, 
-                   GC_Undiff_vs_Diff$Undifferentiated[
-                     rownames(GC_undiff),c(1,5,6)])
-colnames(GC_undiff)[1:4] <- c(paste(colnames(GC_undiff)[1:2], "BE_vs_GC", sep = "."),
-                  paste(colnames(GC_undiff)[3:4], "Undiff_vs_Diff", sep = "."))
-GC_undiff$ID <- rownames(GC_undiff)
-out$GC_undiff_specific <- GC_undiff
+colnames(GC_undiff)[1:4] <- c(paste(colnames(GC_undiff)[1:2], "Undiff_vs_Diff", sep = "."),
+                  paste(colnames(GC_undiff)[3:4], "BE_vs_GC", sep = "."))
+
+# Order table
+GC_undiff <- GC_undiff[order(rowMeans(GC_undiff[,c(2,4)]), decreasing = FALSE),]
+out_spec$GC_undiff_specific <- GC_undiff
 
 # BE specific
-BE_undiff <- Undiff_BE_vs_GC$BE[
-  match(intersect(BE_Undiff_vs_Diff$Undifferentiated$Genename,
-                  Undiff_BE_vs_GC$BE$Genename),
-        Undiff_BE_vs_GC$BE$Genename),]
-BE_undiff <- BE_undiff[order(BE_undiff$FDR, decreasing = FALSE),]
+cur_1 <- out$BE_Undiff_vs_Diff[out$BE_Undiff_vs_Diff$specificity == "Undifferentiated" &
+                                 !is.na(out$BE_Undiff_vs_Diff$specificity),]
+cur_2 <- out$Undiff_BE_vs_GC[out$Undiff_BE_vs_GC$specificity == "BE" &
+                               !is.na(out$Undiff_BE_vs_GC$specificity),]
+shared.genes <- intersect(rownames(cur_1), rownames(cur_2))
+BE_undiff <- cbind(out$BE_Undiff_vs_Diff[shared.genes,], out$Undiff_BE_vs_GC[shared.genes,])
+BE_undiff <- BE_undiff[,c(1,5,9,13,14,15)]
 
-BE_undiff <- BE_undiff[,c(1,5)]
-BE_undiff <- cbind(BE_undiff, 
-                   BE_Undiff_vs_Diff$Undifferentiated[
-                     rownames(BE_undiff),c(1,5,6)])
-colnames(BE_undiff)[1:4] <- c(paste(colnames(BE_undiff)[1:2], "BE_vs_GC", sep = "."),
-                  paste(colnames(BE_undiff)[3:4], "Undiff_vs_Diff", sep = "."))
-BE_undiff$ID <- rownames(BE_undiff)
-out$BE_undiff_specific <- BE_undiff
+colnames(BE_undiff)[1:4] <- c(paste(colnames(BE_undiff)[1:2], "Undiff_vs_Diff", sep = "."),
+                  paste(colnames(BE_undiff)[3:4], "BE_vs_GC", sep = "."))
+
+# Order table
+BE_undiff <- BE_undiff[order(rowMeans(BE_undiff[,c(2,4)]), decreasing = FALSE),]
+out_spec$BE_undiff_specific <- BE_undiff
 
 # Differentiated
 # GC specific
-GC_diff <- Diff_BE_vs_GC$GC[
-  match(intersect(GC_Undiff_vs_Diff$Foveolar_differentiated$Genename,
-                  Diff_BE_vs_GC$GC$Genename),
-        Diff_BE_vs_GC$GC$Genename),]
-GC_diff <- GC_diff[order(GC_diff$FDR, decreasing = FALSE),]
+cur_1 <- out$GC_Undiff_vs_Diff[out$GC_Undiff_vs_Diff$specificity == "Foveolar_differentiated" &
+                                 !is.na(out$GC_Undiff_vs_Diff$specificity),]
+cur_2 <- out$Diff_BE_vs_GC[out$Diff_BE_vs_GC$specificity == "GC" &
+                               !is.na(out$Diff_BE_vs_GC$specificity),]
+shared.genes <- intersect(rownames(cur_1), rownames(cur_2))
+GC_diff <- cbind(out$GC_Undiff_vs_Diff[shared.genes,], out$Diff_BE_vs_GC[shared.genes,])
+GC_diff <- GC_diff[,c(1,5,9,13,14,15)]
 
-GC_diff <- GC_diff[,c(1,5)]
-GC_diff <- cbind(GC_diff, 
-                   GC_Undiff_vs_Diff$Foveolar_differentiated[
-                     rownames(GC_diff),c(1,5,6)])
-colnames(GC_diff)[1:4] <- c(paste(colnames(GC_diff)[1:2], "BE_vs_GC", sep = "."),
-                  paste(colnames(GC_diff)[3:4], "Undiff_vs_Diff", sep = "."))
-GC_diff$ID <- rownames(GC_diff)
-out$GC_diff_specific <- GC_diff
+colnames(GC_diff)[1:4] <- c(paste(colnames(GC_diff)[1:2], "Undiff_vs_Diff", sep = "."),
+                  paste(colnames(GC_diff)[3:4], "BE_vs_GC", sep = "."))
+
+# Order table
+GC_diff <- GC_diff[order(rowMeans(GC_diff[,c(2,4)]), decreasing = FALSE),]
+out_spec$GC_diff_specific <- GC_diff
 
 # BE specific
-BE_diff <- Diff_BE_vs_GC$BE[
-  match(intersect(BE_Undiff_vs_Diff$Foveolar_differentiated$Genename,
-                  Diff_BE_vs_GC$BE$Genename),
-        Diff_BE_vs_GC$BE$Genename),]
-BE_diff <- BE_diff[order(BE_diff$FDR, decreasing = FALSE),]
+cur_1 <- out$BE_Undiff_vs_Diff[out$BE_Undiff_vs_Diff$specificity == "Foveolar_differentiated" &
+                                 !is.na(out$BE_Undiff_vs_Diff$specificity),]
+cur_2 <- out$Diff_BE_vs_GC[out$Diff_BE_vs_GC$specificity == "BE" &
+                               !is.na(out$Diff_BE_vs_GC$specificity),]
+shared.genes <- intersect(rownames(cur_1), rownames(cur_2))
+BE_diff <- cbind(out$BE_Undiff_vs_Diff[shared.genes,], out$Diff_BE_vs_GC[shared.genes,])
+BE_diff <- BE_diff[,c(1,5,9,13,14,15)]
 
-BE_diff <- BE_diff[,c(1,5)]
-BE_diff <- cbind(BE_diff, 
-                   BE_Undiff_vs_Diff$Foveolar_differentiated[
-                     rownames(BE_diff),c(1,5,6)])
-colnames(BE_diff)[1:4] <- c(paste(colnames(BE_diff)[1:2], "BE_vs_GC", sep = "."),
-                  paste(colnames(BE_diff)[3:4], "Undiff_vs_Diff", sep = "."))
-BE_diff$ID <- rownames(BE_diff)
-out$BE_diff_specific <- BE_diff
+colnames(BE_diff)[1:4] <- c(paste(colnames(BE_diff)[1:2], "Undiff_vs_Diff", sep = "."),
+                  paste(colnames(BE_diff)[3:4], "BE_vs_GC", sep = "."))
 
-# Save results
-write.xlsx(out, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S9.xlsx")
-```
+# Order table
+BE_diff <- BE_diff[order(rowMeans(BE_diff[,c(2,4)]), decreasing = FALSE),]
+out_spec$BE_diff_specific <- BE_diff
 
-# Save all genes that were tested
-
-To generate Table S8, we will rerun the DE analysis but this time by storing all (also the non-DE) genes.
-
-```{r}
-# List to save result
-out <- list()
-
-# DE within GC tissue
-sce_test <- cur_sce[,cur_sce$Tissue == "GC" & cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated")]
-GC_Undiff_vs_Diff <- DE.edgeR(sce_test, conditions = sce_test$cell_type,
-                              covariate = sce_test$Patient, lfc = 0.5,
-                              FDR = 1)
-GC_Undiff_vs_Diff$Undifferentiated$specificity <- "Undifferentiated"
-GC_Undiff_vs_Diff$Foveolar_differentiated$specificity <- "Foveolar_differentiated"
-GC_Undiff_vs_Diff.out <- rbind(GC_Undiff_vs_Diff$Undifferentiated,
-                               GC_Undiff_vs_Diff$Foveolar_differentiated[
-              seq(nrow(GC_Undiff_vs_Diff$Foveolar_differentiated), 1),])
-out$GC_Undiff_vs_Diff <- GC_Undiff_vs_Diff.out
-
-# DE within BE tissue
-sce_test <- cur_sce[,cur_sce$Tissue == "BE" & cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated")]
-BE_Undiff_vs_Diff <- DE.edgeR(sce_test, conditions = sce_test$cell_type,
-                              covariate = sce_test$Patient, lfc = 0.5,
-                              FDR = 1)
-BE_Undiff_vs_Diff$Undifferentiated$specificity <- "Undifferentiated"
-BE_Undiff_vs_Diff$Foveolar_differentiated$specificity <- "Foveolar_differentiated"
-BE_Undiff_vs_Diff.out <- rbind(BE_Undiff_vs_Diff$Undifferentiated,
-                               BE_Undiff_vs_Diff$Foveolar_differentiated[
-              seq(nrow(BE_Undiff_vs_Diff$Foveolar_differentiated), 1),])
-out$BE_Undiff_vs_Diff <- BE_Undiff_vs_Diff.out
-
-# DE within undiff cells tissue
-sce_test <- cur_sce[,cur_sce$cell_type == "Undifferentiated"]
-Undiff_BE_vs_GC <- DE.edgeR(sce_test, conditions = sce_test$Tissue,
-                              covariate = sce_test$Patient, lfc = 0.5,
-                              FDR = 1)
-Undiff_BE_vs_GC$GC$specificity <- "GC"
-Undiff_BE_vs_GC$BE$specificity <- "BE"
-Undiff_BE_vs_GC.out <- rbind(Undiff_BE_vs_GC$GC,
-                               Undiff_BE_vs_GC$BE[
-              seq(nrow(Undiff_BE_vs_GC$BE), 1),])
-out$Undiff_BE_vs_GC <- Undiff_BE_vs_GC.out
-
-# DE within diff cells tissue
-sce_test <- cur_sce[,cur_sce$cell_type == "Foveolar_differentiated"]
-Diff_BE_vs_GC <- DE.edgeR(sce_test, conditions = sce_test$Tissue,
-                              covariate = sce_test$Patient, lfc = 0.5,
-                              FDR = 1)
-Diff_BE_vs_GC$GC$specificity <- "GC"
-Diff_BE_vs_GC$BE$specificity <- "BE"
-Diff_BE_vs_GC.out <- rbind(Diff_BE_vs_GC$GC,
-                               Diff_BE_vs_GC$BE[
-              seq(nrow(Diff_BE_vs_GC$BE), 1),])
-out$Diff_BE_vs_GC <- Diff_BE_vs_GC.out
+# Visualize results
+cur_mat <- logcounts(cur_sce)[out_spec$GC_diff_specific$ID,]
+colnames(cur_mat) <- paste(cur_sce$Barcode, cur_sce$Patient)
+cur_dat <- data.frame(row.names = colnames(cur_mat),
+                                     cell_type = cur_sce$cell_type,
+                                     tissue = cur_sce$Tissue)
+pheatmap(cur_mat[,order(cur_dat$cell_type, cur_dat$tissue)], 
+         cluster_rows = FALSE, 
+         annotation_col = cur_dat[order(cur_dat$cell_type, cur_dat$tissue),],
+         show_colnames = FALSE, cluster_cols = FALSE)
 
 # Save results
-write.xlsx(out, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S8.xlsx")
+write.xlsx(out_spec, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S8.xlsx")
 ```
 
 # Visualize marker genes
@@ -344,6 +304,7 @@ genes <- c("MYC", "HNF4A", "KRT7", "NCL", "CD44", "CLDN3",
            "FBP1", "OCIAD2", "LEFTY1")
 
 # Normalization across all cells displayed
+
 
 # Visualize gene expression in form of boxplots
 for.plot <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol, ),]
