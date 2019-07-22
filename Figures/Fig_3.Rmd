@@ -49,7 +49,6 @@ cur_sce <- cur_sce[,!(cur_sce$cell_type %in% c("Chief", "Endocrine", "Goblet", "
 
 # Remove genes that are not expressed
 cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
-cur_sce <- normalize(cur_sce)
 
 # Perform batch correction
 sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
@@ -67,6 +66,15 @@ UMAP_BE_GC.tissue <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
   geom_point(aes(UMAP1, UMAP2, colour = tissue)) +
   scale_colour_manual(values = metadata(cur_sce)$colour_vector)
 
+set.seed(1234)
+tsne <- Rtsne(t(corrected))
+
+tsne_BE_GC.tissue <- ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  tissue = cur_sce$Tissue)) +
+  geom_point(aes(tsne1, tsne2, colour = tissue)) +
+  scale_colour_manual(values = metadata(cur_sce)$colour_vector)
+
 # Colour vector for cell-types
 colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
 names(colour_vector) <- unique(cur_sce$cell_type)
@@ -80,6 +88,13 @@ UMAP_BE_GC.cell_type <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
                   tissue = cur_sce$cell_type)) +
   geom_point(aes(UMAP1, UMAP2), colour = "black", size = 2) +
   geom_point(aes(UMAP1, UMAP2, colour = tissue)) +
+  scale_colour_manual(values = colour_vector)
+
+tsne_BE_GC.cell_type <- ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  tissue = cur_sce$cell_type)) +
+  geom_point(aes(tsne1, tsne2), colour = "black", size = 2) +
+  geom_point(aes(tsne1, tsne2, colour = tissue)) +
   scale_colour_manual(values = colour_vector)
 
 # Save figures
@@ -286,6 +301,8 @@ write.xlsx(out, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_dra
 genes <- c("MYC", "HNF4A", "KRT7", "NCL", "CD44", "CLDN3", 
            "MGST2", "MGST3", "CHCHD10", "DNPH1", 
            "FBP1", "OCIAD2", "LEFTY1")
+
+# Normalization across all cells displayed
 
 # Visualize gene expression in form of boxplots
 for.plot <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol, ),]
