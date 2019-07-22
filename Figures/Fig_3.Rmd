@@ -67,7 +67,7 @@ UMAP_BE_GC.tissue <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
   scale_colour_manual(values = metadata(cur_sce)$colour_vector)
 
 set.seed(1234)
-tsne <- Rtsne(t(corrected))
+tsne <- Rtsne(t(corrected), pca = FALSE)
 
 tsne_BE_GC.tissue <- ggplot(data.frame(tsne1 = tsne$Y[,1],
                   tsne2 = tsne$Y[,2],
