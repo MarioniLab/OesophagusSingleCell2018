@@ -90,6 +90,12 @@ UMAP_BE_GC.cell_type <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
   geom_point(aes(UMAP1, UMAP2, colour = tissue)) +
   scale_colour_manual(values = colour_vector)
 
+UMAP_BE_GC.patient <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
+                  UMAP2 = UMAP$layout[,2],
+                  tissue = cur_sce$Patient)) +
+  geom_point(aes(UMAP1, UMAP2), colour = "black", size = 2) +
+  geom_point(aes(UMAP1, UMAP2, colour = tissue)) 
+
 tsne_BE_GC.cell_type <- ggplot(data.frame(tsne1 = tsne$Y[,1],
                   tsne2 = tsne$Y[,2],
                   tissue = cur_sce$cell_type)) +
@@ -111,53 +117,88 @@ Here, we perform DE between progenitor and differentiated cell types and across 
 out <- list()
 
 # DE within GC tissue
-sce_test <- cur_sce[,cur_sce$Tissue == "GC" & cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated")]
+sce_test <- cur_sce[,cur_sce$Tissue == "GC" & 
+                      cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated")]
+
+# We set the FDR to 1 to retain all genes
 GC_Undiff_vs_Diff <- DE.edgeR(sce_test, conditions = sce_test$cell_type,
                               covariate = sce_test$Patient, lfc = 0.5,
-                              FDR = 0.1)
-GC_Undiff_vs_Diff$Undifferentiated$specificity <- "Undifferentiated"
-GC_Undiff_vs_Diff$Foveolar_differentiated$specificity <- "Foveolar_differentiated"
+                              FDR = 1)
 GC_Undiff_vs_Diff.out <- rbind(GC_Undiff_vs_Diff$Undifferentiated,
                                GC_Undiff_vs_Diff$Foveolar_differentiated[
               seq(nrow(GC_Undiff_vs_Diff$Foveolar_differentiated), 1),])
+
+GC_Undiff_vs_Diff.out$specificity <- NA
+GC_Undiff_vs_Diff.out$specificity[GC_Undiff_vs_Diff.out$logFC < 0 & GC_Undiff_vs_Diff.out$FDR <= 0.1] <- "Undifferentiated"
+GC_Undiff_vs_Diff.out$specificity[GC_Undiff_vs_Diff.out$logFC > 0 & GC_Undiff_vs_Diff.out$FDR <= 0.1] <- "Foveolar_differentiated"
+
 out$GC_Undiff_vs_Diff <- GC_Undiff_vs_Diff.out
 
 # DE within BE tissue
 sce_test <- cur_sce[,cur_sce$Tissue == "BE" & cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated")]
 BE_Undiff_vs_Diff <- DE.edgeR(sce_test, conditions = sce_test$cell_type,
                               covariate = sce_test$Patient, lfc = 0.5,
-                              FDR = 0.1)
-BE_Undiff_vs_Diff$Undifferentiated$specificity <- "Undifferentiated"
-BE_Undiff_vs_Diff$Foveolar_differentiated$specificity <- "Foveolar_differentiated"
+                              FDR = 1)
+
 BE_Undiff_vs_Diff.out <- rbind(BE_Undiff_vs_Diff$Undifferentiated,
                                BE_Undiff_vs_Diff$Foveolar_differentiated[
               seq(nrow(BE_Undiff_vs_Diff$Foveolar_differentiated), 1),])
+
+BE_Undiff_vs_Diff.out$specificity <- NA
+BE_Undiff_vs_Diff.out$specificity[BE_Undiff_vs_Diff.out$logFC < 0 & BE_Undiff_vs_Diff.out$FDR <= 0.1] <- "Undifferentiated"
+BE_Undiff_vs_Diff.out$specificity[BE_Undiff_vs_Diff.out$logFC > 0 & BE_Undiff_vs_Diff.out$FDR <= 0.1] <- "Foveolar_differentiated"
+
 out$BE_Undiff_vs_Diff <- BE_Undiff_vs_Diff.out
 
 # DE within undiff cells tissue
 sce_test <- cur_sce[,cur_sce$cell_type == "Undifferentiated"]
 Undiff_BE_vs_GC <- DE.edgeR(sce_test, conditions = sce_test$Tissue,
                               covariate = sce_test$Patient, lfc = 0.5,
-                              FDR = 0.1)
-Undiff_BE_vs_GC$GC$specificity <- "GC"
-Undiff_BE_vs_GC$BE$specificity <- "BE"
+                              FDR = 1)
+
 Undiff_BE_vs_GC.out <- rbind(Undiff_BE_vs_GC$GC,
                                Undiff_BE_vs_GC$BE[
               seq(nrow(Undiff_BE_vs_GC$BE), 1),])
+
+Undiff_BE_vs_GC.out$specificity <- NA
+Undiff_BE_vs_GC.out$specificity[Undiff_BE_vs_GC.out$logFC < 0 & Undiff_BE_vs_GC.out$FDR <= 0.1] <- "GC"
+Undiff_BE_vs_GC.out$specificity[Undiff_BE_vs_GC.out$logFC > 0 & Undiff_BE_vs_GC.out$FDR <= 0.1] <- "BE"
+
 out$Undiff_BE_vs_GC <- Undiff_BE_vs_GC.out
 
 # DE within diff cells tissue
 sce_test <- cur_sce[,cur_sce$cell_type == "Foveolar_differentiated"]
 Diff_BE_vs_GC <- DE.edgeR(sce_test, conditions = sce_test$Tissue,
                               covariate = sce_test$Patient, lfc = 0.5,
-                              FDR = 0.1)
-Diff_BE_vs_GC$GC$specificity <- "GC"
-Diff_BE_vs_GC$BE$specificity <- "BE"
+                              FDR = 1)
+
 Diff_BE_vs_GC.out <- rbind(Diff_BE_vs_GC$GC,
                                Diff_BE_vs_GC$BE[
               seq(nrow(Diff_BE_vs_GC$BE), 1),])
+
+Diff_BE_vs_GC.out$specificity <- NA
+Diff_BE_vs_GC.out$specificity[Diff_BE_vs_GC.out$logFC < 0 & Diff_BE_vs_GC.out$FDR <= 0.1] <- "GC"
+Diff_BE_vs_GC.out$specificity[Diff_BE_vs_GC.out$logFC > 0 & Diff_BE_vs_GC.out$FDR <= 0.1] <- "BE"
+
 out$Diff_BE_vs_GC <- Diff_BE_vs_GC.out
 
+
+# Visualize genes 
+# Just the raw counts to check if DE worked
+cur_tab <- out$Diff_BE_vs_GC
+cur_mat <- logcounts(cur_sce)[c(rownames(cur_tab)[1:20], rownames(cur_tab)[(nrow(cur_tab)-20):nrow(cur_tab)]),]
+colnames(cur_mat) <- paste(cur_sce$Barcode, cur_sce$Patient)
+pheatmap(cur_mat, 
+         cluster_rows = FALSE, 
+         annotation_col = data.frame(row.names = colnames(cur_mat),
+                                     cell_type = cur_sce$cell_type,
+                                     tissue = cur_sce$Tissue),
+         show_colnames = FALSE, gaps_row = 20)
+
+```
+
+
+```{r}
 # Find overlap between Undiff and Diff specific genes and tissue comparisons
 # We save the comparison between the tissues
 # We then remove unecessary columns and add the comparison between undiff and diff

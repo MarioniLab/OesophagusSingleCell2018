@@ -225,6 +225,9 @@ DE.edgeR <- function(sce, conditions, covariate, lfc, FDR){
                                              conditions == cur_condition]) 
   }
   
+  # Print the number of samples on each side
+  print(colnames(mat))
+  
   # Perform differential testing
   y <- DGEList(counts=mat,
                group=sapply(colnames(mat), 
@@ -245,7 +248,7 @@ DE.edgeR <- function(sce, conditions, covariate, lfc, FDR){
   
   # Save markers
   cur_out <- list()
-  cur_out[[colnames(design)[2]]] <- cur_markers[cur_markers$logFC < 0 & cur_markers$FDR <= FDR,]
+  cur_out[[colnames(design)[2]]] <- cur_markers[cur_markers$logFC <= 0 & cur_markers$FDR <= FDR,]
   cur_out[[colnames(design)[2]]]$Genename <- rowData(sce)$Symbol[match(rownames(cur_out[[colnames(design)[2]]]),
                                                                    rowData(sce)$ID)]
   cur_out[[colnames(design)[1]]] <- cur_markers[cur_markers$logFC > 0 & cur_markers$FDR <= FDR,]
