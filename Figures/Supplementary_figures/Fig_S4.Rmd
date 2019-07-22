@@ -181,7 +181,7 @@ DE.genes <- multi.DE(sce = cur_sce,
                      conditions = cur_sce$cell_type,
                      covariate = cur_sce$Patient,
                      lfc = 0.5,
-                     FDR = 1)
+                     FDR = 0.1)
 
 # Compare to scran
 markers <- marker.detection(cur_sce, clusters = cur_sce$cell_type)
@@ -276,7 +276,7 @@ DE.genes <- multi.DE(sce = cur_sce,
                      conditions = cur_sce$cell_type,
                      covariate = cur_sce$Patient,
                      lfc = 0.5,
-                     FDR = 1)
+                     FDR = 0.1)
 
 # Save as table
 write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S5.xlsx")
