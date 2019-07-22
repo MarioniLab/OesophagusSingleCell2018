@@ -304,10 +304,25 @@ genes <- c("MYC", "HNF4A", "KRT7", "NCL", "CD44", "CLDN3",
            "FBP1", "OCIAD2", "LEFTY1")
 
 # Normalization across all cells displayed
+cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$Tissue, cur_sce$cell_type))
+cur_sce <- normalize(cur_sce, return_log = TRUE)
 
+# Visualize the size factors
+ggplot(data.frame(UMAP1 = UMAP$layout[,1],
+                  UMAP2 = UMAP$layout[,2],
+                  sf = sizeFactors(cur_sce))) +
+  geom_point(aes(UMAP1, UMAP2, colour = sf)) +
+  scale_colour_viridis()
+
+# Visualize library size
+ggplot(data.frame(UMAP1 = UMAP$layout[,1],
+                  UMAP2 = UMAP$layout[,2],
+                  size = log10(colSums(counts(cur_sce))))) +
+  geom_point(aes(UMAP1, UMAP2, colour = size)) +
+  scale_colour_viridis()
 
 # Visualize gene expression in form of boxplots
-for.plot <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol, ),]
+for.plot <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
 colnames(for.plot) <- paste(cur_sce$Tissue, cur_sce$cell_type, cur_sce$Barcode, sep = "_")
 
 # Order cells
@@ -324,6 +339,19 @@ pdf("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figu
     width = 10, height = 5)
 pheatmap(for.plot[,ind_order], cluster_rows = FALSE, cluster_cols = FALSE,
          color = viridis(100), labels_row = genes, 
+         annotation_col = data.frame(row.names = colnames(for.plot)[ind_order],
+                                     cell_type = cur_sce$cell_type[ind_order],
+                                     tissue = cur_sce$Tissue[ind_order]),
+         annotation_colors = list(cell_type = colour_vector,
+                                  tissue = metadata(cur_sce)$colour_vector),
+         show_colnames = FALSE)
+dev.off()
+
+pdf("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/Heatmap_marker_genes.scaled.pdf", 
+    width = 10, height = 5)
+pheatmap(for.plot[,ind_order], cluster_rows = FALSE, cluster_cols = FALSE,
+         color = colorRampPalette(c("dark blue", "blue", "white", "red", "dark red"))(100), 
+         labels_row = genes, scale = "row",
          annotation_col = data.frame(row.names = colnames(for.plot)[ind_order],
                                      cell_type = cur_sce$cell_type[ind_order],
                                      tissue = cur_sce$Tissue[ind_order]),
@@ -369,17 +397,18 @@ GC_MYC <- ggplot() +
              aes(PT, value, colour = MYC), size = 2) +
     geom_point(data = cur_df[cur_df$MYC > 0,], 
              aes(PT, value, colour = MYC), size = 2) +
-  scale_colour_viridis(limits = c(0, 4.5))
+  scale_colour_viridis(limits = c(0, 4.2))
 
 cur_df <- data.frame(PT = pt_GC[,"lambda"],
                   value = rand,
                   HNF4A = logcounts(cur_GC)[rowData(cur_GC)$Symbol == "HNF4A",])
+
 GC_HNF4A <- ggplot() +
   geom_point(data = cur_df[cur_df$HNF4A == 0,], 
              aes(PT, value, colour = HNF4A), size = 2) +
     geom_point(data = cur_df[cur_df$HNF4A > 0,], 
              aes(PT, value, colour = HNF4A), size = 2) +
-  scale_colour_viridis(limits = c(0, 4.5))
+  scale_colour_viridis(limits = c(0, 4.2))
 
 ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/GC_pseudotime.pdf", 
        plot = GC.PT, width = 7, height = 2)
@@ -419,7 +448,7 @@ BE_MYC <- ggplot() +
              aes(PT, value, colour = MYC), size = 2) +
     geom_point(data = cur_df[cur_df$MYC > 0,], 
              aes(PT, value, colour = MYC), size = 2) +
-  scale_colour_viridis(limits = c(0, 4.5))
+  scale_colour_viridis(limits = c(0, 4.2))
 
 cur_df <- data.frame(PT = pt_BE[,"lambda"],
                   value = rand,
@@ -429,7 +458,7 @@ BE_HNF4A <- ggplot() +
              aes(PT, value, colour = HNF4A), size = 2) +
     geom_point(data = cur_df[cur_df$HNF4A > 0,], 
              aes(PT, value, colour = HNF4A), size = 2) +
-  scale_colour_viridis(limits = c(0, 4.5))
+  scale_colour_viridis(limits = c(0, 4.2))
 
 ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_pseudotime.pdf", 
        plot = BE.PT, width = 7, height = 2)
