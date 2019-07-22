@@ -118,9 +118,7 @@ Here, we display marker genes selected from the list of cluster-specific marker 
 
 ```{r}
 # We first normalize gene expression across all selected cells
-clusters <- quickCluster(cur_sce, method = "igraph", irlba.args = c("work" = 100), 
-                         min.size = 10, use.ranks=TRUE)
-cur_sce <- computeSumFactors(cur_sce, clusters=clusters)
+cur_sce <- computeSumFactors(cur_sce, clusters=cur_sce$cell_type)
 cur_sce <- normalize(cur_sce, return_log = TRUE)
 
 genes <- c("CDH1", "TFF3", "MUC5B", "AGR2", "KRT8", "SLPI", 
