@@ -1,5 +1,5 @@
 ---
-title: "Figure S5: Characterization of BE cells"
+title: "Figure S4: Characterization of all GI tissues"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -7,14 +7,15 @@ output:
     toc: true
     toc_depth: 2
 knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S5.html') })
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S4.html') })
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-This script plots cell-types of BE and highlights marker genes.
+This script highlights cell-types and differentially expressed genes within all tissues of the upper GI tract.
+For each tissue, we re-perform batch correction and visualize cell-types using tSNE dimensionality reduction.
 
 # Read in the data
 
@@ -34,14 +35,14 @@ sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cel
 sce <- sce[,sce$include]
 ```
 
-# Barret's oesophagus
+# Normal oesophagus
 
-We will visualize marker genes of Barret's oesophagus.
+We will first visualize marker genes of normal oesophagus.
 
 ## Dimensionality reduction
 
 ```{r}
-cur_sce <- sce[,sce$Tissue == "BE"]
+cur_sce <- sce[,sce$Tissue == "NE"]
 
 # Split the samples to perform batch correction
 sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
@@ -49,28 +50,222 @@ cur_sce <- do.call("cbind", sce.list)
 corrected <- batch.correction(sce.list)
 
 # Compute tSNE
-set.seed(123)
+set.seed(12345)
 tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
 
 # Create colour vector
 colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
 names(colour_vector) <- unique(cur_sce$cell_type)
-colour_vector["Undifferentiated"] <- "white"
-colour_vector["Dividing"] <- colorRampPalette(c("white", "#00A087FF"))(10)[2]
-colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#00A087FF"))(10)[4]
-colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#00A087FF"))(10)[6]
-colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark green"))(10)[5]
-colour_vector["Goblet"] <- colorRampPalette(c("white", "dark green"))(10)[10]
+colour_vector["Unknown"] <- "grey"
+colour_vector["Suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[10]
+colour_vector["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
+colour_vector["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
+colour_vector["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[1]
 
-tsne.BE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+tsne.NE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
                   tSNE2 = tsne$Y[,2],
                   cell_type = cur_sce$cell_type)) + 
   geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
   geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
   scale_color_manual(values = colour_vector) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/BE_tsne.pdf", tsne.BE, width = 6, height = 5)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
 ```
+
+## Marker genes expression
+
+Here, we perform pairwise DE testing to find cluster specific marker genes.
+
+```{r}
+# Remove non-expressed genes
+cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
+
+# Perform DE
+DE.genes <- multi.DE(sce = cur_sce, 
+                     conditions = cur_sce$cell_type,
+                     covariate = cur_sce$Patient,
+                     lfc = 0.5,
+                     FDR = 0.1)
+
+# Save as table
+write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S3.xlsx")
+```
+
+## Marker gene expression
+
+We next order cells along their spatial postion in the tissue and visualize known marker genes along this trajectory.
+
+```{r}
+# Removed "unknown" due to possible doublets
+corrected <- corrected[,cur_sce$cell_type != "Unknown"]
+cur_sce <- cur_sce[,cur_sce$cell_type != "Unknown"]
+
+# Calculate pseudorank on corrected counts
+cur_rd <- t(corrected[1:10,])
+rownames(cur_rd) <- paste(cur_sce$Tissue, cur_sce$Patient, cur_sce$Barcode, sep = "_")
+colnames(cur_rd) <- paste("PC", 1:10)
+clusters <- cur_sce$cell_type
+names(clusters) <- rownames(cur_rd)
+PR <- PT(rd = cur_rd, clusters = cur_sce$cell_type, 
+         col_vector = colour_vector)
+
+# Perform normalization across all cells
+cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
+cur_sce <- normalize(cur_sce, return_log = TRUE)
+
+# Visualize marker genes in heatmap
+genes <- c("KRT4", "KRT5")
+for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),
+                                  order(PR[,"rank"], decreasing = TRUE)]
+colnames(for.heatmap) <- rownames(cur_rd)[order(PR[,"rank"], decreasing = TRUE)]
+
+pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/NE_heatmap.pdf",
+    width = 10, height = 2)
+pheatmap(for.heatmap, cluster_cols = FALSE, cluster_rows = FALSE, labels_row = genes,
+         color = viridis(100), annotation_col = 
+           data.frame(row.names = colnames(for.heatmap),
+                      cell_type = cur_sce$cell_type[order(PR[,"rank"], decreasing = TRUE)]),
+         annotation_colors = list(cell_type = colour_vector), 
+         show_colnames = FALSE) 
+dev.off()
+```
+
+# Stomach
+
+We will next visualize the tissue composition of stomach.
+
+## Dimensionality reduction
+
+```{r}
+cur_sce <- sce[,sce$Tissue == "GC"]
+
+# Split the samples to perform batch correction
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+cur_sce <- do.call("cbind", sce.list)
+corrected <- batch.correction(sce.list)
+
+# Compute tSNE
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+
+# Create colour vector
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[10]
+colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark blue"))(10)[10]
+colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[3]
+colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[6]
+colour_vector["Chief"] <- colorRampPalette(c("white", "dark blue"))(10)[6]
+colour_vector["Parietal"] <- colorRampPalette(c("white", "dark blue"))(10)[3]
+
+tsne.GC <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  cell_type = cur_sce$cell_type)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
+  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
+  scale_color_manual(values = colour_vector) + theme_minimal()
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/GC_tsne.pdf", tsne.GC, width = 6, height = 5)
+```
+
+## Marker genes expression
+
+Here, we perform pairwise DE testing to find cluster specific marker genes.
+
+```{r}
+# Remove non-expressed genes
+cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
+
+# Perform DE to find marker genes
+DE.genes <- multi.DE(sce = cur_sce, 
+                     conditions = cur_sce$cell_type,
+                     covariate = cur_sce$Patient,
+                     lfc = 0.5,
+                     FDR = 0.1)
+
+# Compare to scran
+markers <- marker.detection(cur_sce, clusters = cur_sce$cell_type)
+
+# Save as table
+write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S4.xlsx")
+```
+
+## Marker gene expression
+
+Here, we visualize marker gene expression in form of a heatmap
+
+```{r}
+genes <- c("MUC5AC", "KRT20", 
+           "PGA3", "PGA4", "PGA5", "LYZ", 
+           "GHRL", "CHGA", "CHGB", 
+           "MUC6", 
+           "GIF", "ATP4A",
+           "OLFM4", "LGR5")
+
+# Normalize across all cells
+cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
+cur_sce <- normalize(cur_sce, return_log = TRUE)
+
+# Visualize markers
+for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
+colnames(for.heatmap) <- paste(cur_sce$Barcode, cur_sce$Patient, sep = "_")
+
+# Order cells by cell-type
+ordering <- c(which(cur_sce$cell_type == "Undifferentiated"),
+               which(cur_sce$cell_type == "Foveolar_Intermediate"),
+               which(cur_sce$cell_type == "Foveolar_differentiated"),
+               which(cur_sce$cell_type == "Chief"),
+               which(cur_sce$cell_type == "Endocrine"),
+               which(cur_sce$cell_type == "Parietal"))
+
+pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/GC_heatmap.pdf", height = 7, width = 7)
+pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100), 
+         labels_row = genes, show_colnames = FALSE,
+         annotation_col = data.frame(row.names = colnames(for.heatmap)[ordering],
+                                     cell_type = cur_sce$cell_type[ordering]), 
+         annotation_colors = list(cell_type = colour_vector),
+         cluster_cols = FALSE)
+dev.off()
+```
+# Duodenum
+
+## Dimensionality reduction
+
+```{r}
+cur_sce <- sce[,sce$Tissue == "D2"]
+
+# Split the samples to perform batch correction
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+cur_sce <- do.call("cbind", sce.list)
+corrected <- batch.correction(sce.list)
+
+# Compute tSNE
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+
+# Create colour vector
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Enterocytes_Intermediate"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[6]
+colour_vector["Enterocytes_differentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[10]
+colour_vector["Dividing"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[3]
+colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[1]
+colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
+colour_vector["Paneth"] <- colorRampPalette(c("white", "seagreen4"))(10)[6]
+
+tsne.D2 <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  cell_type = cur_sce$cell_type)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
+  scale_color_manual(values = colour_vector) + theme_minimal()
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/D2_tsne.pdf", tsne.D2, width = 6, height = 5)
+```
+
+## Marker genes expression
+
+Here, we perform pairwise DE testing to find cluster specific marker genes.
 
 ```{r}
 # Remove non-expressed genes
@@ -84,21 +279,20 @@ DE.genes <- multi.DE(sce = cur_sce,
                      FDR = 0.1)
 
 # Save as table
-write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S6.xlsx")
+write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S5.xlsx")
 ```
 
 ## Marker gene expression
 
-Here, we visualize marker gene expression in form of a heatmap
-
 ```{r}
-genes <- c("MUC5AC", "KRT20", 
-           "MUC6", 
-           "MUC2", "TFF3", "KRT7",
-           "CHGA", 
-           "OLFM4")
+genes <- c("OLFM4",
+           "LGR5",
+           "APOB",
+           "MUC2", 
+           "TFF3", 
+           "LYZ")
 
-# Normalization across all cells
+# Normalize across all cells
 cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
 cur_sce <- normalize(cur_sce, return_log = TRUE)
 
@@ -107,13 +301,13 @@ colnames(for.heatmap) <- paste(cur_sce$Barcode, cur_sce$Patient, sep = "_")
 
 # Order cells by cell-type
 ordering <- c(which(cur_sce$cell_type == "Undifferentiated"),
-              which(cur_sce$cell_type == "Dividing"),
-               which(cur_sce$cell_type == "Foveolar_Intermediate"),
-               which(cur_sce$cell_type == "Foveolar_differentiated"),
-               which(cur_sce$cell_type == "Endocrine"),
-               which(cur_sce$cell_type == "Goblet"))
+               which(cur_sce$cell_type == "Dividing"),
+               which(cur_sce$cell_type == "Enterocytes_Intermediate"),
+               which(cur_sce$cell_type == "Enterocytes_differentiated"),
+               which(cur_sce$cell_type == "Goblet"),
+               which(cur_sce$cell_type == "Paneth"))
 
-pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/BE_heatmap.pdf", height = 7, width = 7)
+pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/D2_heatmap.pdf", height = 7, width = 7)
 pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100), 
          labels_row = genes, show_colnames = FALSE,
          annotation_col = data.frame(row.names = colnames(for.heatmap)[ordering],
@@ -122,3 +316,5 @@ pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100),
          cluster_cols = FALSE)
 dev.off()
 ```
+
+

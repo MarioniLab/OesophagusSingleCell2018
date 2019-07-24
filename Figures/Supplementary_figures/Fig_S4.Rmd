@@ -1,5 +1,5 @@
 ---
-title: "Figure S4: Characterization of all GI tissues"
+title: "Figure S2: Computational processing of all data"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -7,15 +7,16 @@ output:
     toc: true
     toc_depth: 2
 knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S4.html') })
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S2.html') })
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-This script highlights cell-types and differentially expressed genes within all tissues of the upper GI tract.
-For each tissue, we re-perform batch correction and visualize cell-types using tSNE dimensionality reduction.
+This script visualizes the filtered data obtained after running the Quality_control, Normalization and Further_processing scripts. 
+We will first plot these cells to highlight the patient effect and afterwards perform batch-correction.
+Finally, we will mark the high-quality batches and cells.
 
 # Read in the data
 
@@ -25,296 +26,160 @@ library(scater)
 library(DropletUtils)
 library(openxlsx)
 library(Rtsne)
-library(pheatmap)
-library(viridis)
 source("../../Analysis/Functions/auxiliary.R")
-
-sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
-
-# Remove contaminating cell-types
-sce <- sce[,sce$include]
 ```
 
-# Normal oesophagus
+# Dimensionality reduction
 
-We will first visualize marker genes of normal oesophagus.
-
-## Dimensionality reduction
+We will first visualize the uncorrected data.
 
 ```{r}
-cur_sce <- sce[,sce$Tissue == "NE"]
+# Read in all datafiles
+sce.list <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
 
-# Split the samples to perform batch correction
-sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
-cur_sce <- do.call("cbind", sce.list)
+# Here we exclude the samples that were just used as test runs
+sce.list <- sce.list[!(names(sce.list) %in% c("Patient6_SIGAH9_DT1", "Patient6_SIGAG9_GD3",
+                                              "Patient4_SIGAG4_SMG"))]
+
+# Remove all unecessary rowData prior to merging
+sce.list <- lapply(sce.list, function(n){
+    rowData(n) <- rowData(n)[,1:3]
+    n
+  })
+
+# Merge datasets
+sce.all <- do.call("cbind", sce.list)
+sce.all <- normalize(sce.all)
+
+# Compute the top 1000 shared highly variable genes
+HVG.genes <- lapply(sce.list, function(n){
+    HVG <- trendVar(n, use.spikes = FALSE)
+    decomposeVar(n, HVG)
+  })
+HVG.df <- do.call("combineVar", HVG.genes)
+HVG.df <- HVG.df[order(HVG.df$bio, decreasing = TRUE),]
+HVgenes <- rownames(HVG.df)[1:1000]
+
+# Compute tsne
+set.seed(123456)
+tsne <- Rtsne(t(as.matrix(logcounts(sce.all)[HVgenes,])), perplexity = 100)
+
+# Create annotation and colour vector
+annot <- paste(colData(sce.all)$Tissue, colData(sce.all)$Patient, sep = "_")
+annot.col <- vector(length = length(unique(annot)))
+names(annot.col) <- unique(annot)
+annot.col[grepl("NE", names(annot.col))] <- colorRampPalette(c("white", "dark red"))(21)[c(5,7,9,11,13,15,17,19,21)]
+annot.col[grepl("GOJ", names(annot.col))] <- colorRampPalette(c("white", "#F39B7FFF"))(21)[c(9,11,13,15,17,19,21)]
+annot.col[grepl("SCJ", names(annot.col))] <- colorRampPalette(c("white", "#DC0000FF"))(17)[c(13,15,17)]
+annot.col[grepl("BE", names(annot.col))] <- colorRampPalette(c("white", "#00A087FF"))(17)[c(5,9,13,17)]
+annot.col[grepl("D2", names(annot.col))] <- colorRampPalette(c("white", "#3C5488FF"))(17)[c(5,9,13,17)]
+annot.col[grepl("GC", names(annot.col))] <- colorRampPalette(c("white", "#4DBBD5FF"))(25)[c(5,7,9,11,13,15,17,19,21,23,25)]
+annot.col[grepl("SMG", names(annot.col))] <- colorRampPalette(c("white", "#B09C85FF"))(17)[c(5,9,13)]
+
+# Plot tsne
+tsne.uncorrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], 
+                                      tsne2 = tsne$Y[,2], 
+                                      Sample = annot)) + 
+  geom_point(aes(tsne1, tsne2, colour = Sample)) + 
+  scale_colour_manual(values = annot.col) + 
+  theme_minimal()
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_uncorrected.pdf", tsne.uncorrected, width = 12, height = 7)
+```
+
+# Batch correction across tissues
+
+We will now perform batch correction across all samples. 
+For this, we will use the samples that contain a mix of different tissues first.
+
+```{r}
+# Order sce objects for batch correction
+n <- names(sce.list)
+sce.list <- sce.list[c(which(grepl("NE", n)), which(grepl("GOJ", n)),
+                       which(grepl("SCJ", n)), which(grepl("GC", n)),
+                       which(grepl("BE", n)), which(grepl("D2", n)),
+                       which(grepl("SMG", n)))]
+
+# Combine sce objects
+sce.all <- do.call("cbind", sce.list)
+sce.all <- normalize(sce.all)
+  
+# Batch correction
 corrected <- batch.correction(sce.list)
+  
+# Compute tsne on corrected counts
+set.seed(123)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 150)
 
-# Compute tSNE
-set.seed(12345)
-tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+# Visualize batches
+annot <- paste(colData(sce.all)$Tissue, colData(sce.all)$Patient, sep = "_")
 
-# Create colour vector
-colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
-names(colour_vector) <- unique(cur_sce$cell_type)
-colour_vector["Unknown"] <- "grey"
-colour_vector["Suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[10]
-colour_vector["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
-colour_vector["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
-colour_vector["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[1]
+tsne.corrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], 
+                        Sample = annot)) + 
+  geom_point(aes(tsne1, tsne2, colour = Sample)) + scale_colour_manual(values = annot.col) + theme_minimal()
 
-tsne.NE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  cell_type = cur_sce$cell_type)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
-  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
-  scale_color_manual(values = colour_vector) + theme_minimal()
-
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_corrected.pdf", tsne.corrected, width = 12, height = 7)
 ```
 
-## Marker genes expression
+# High quality samples
 
-Here, we perform pairwise DE testing to find cluster specific marker genes.
+In the next step, we will highlight the high quality samples. 
+The exclusion criteria is explained in Suppementary Note 1.
 
 ```{r}
-# Remove non-expressed genes
-cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
+# Read in the data of high quality samples
+sce.high.quality <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/High_quality_sce.rds")
+annot.high.quality <- sapply(names(sce.high.quality), function(n){paste(unlist(strsplit(n, "_"))[c(3,1)], collapse = "_")})
 
-# Perform DE
-DE.genes <- multi.DE(sce = cur_sce, 
-                     conditions = cur_sce$cell_type,
-                     covariate = cur_sce$Patient,
-                     lfc = 0.5,
-                     FDR = 0.1)
+# Grey out the cells that we are not using
+annot.col.high.quality <- annot.col
+annot.col.high.quality[!(names(annot.col.high.quality) %in% annot.high.quality)] <- "black"
 
-# Save as table
-write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S3.xlsx")
+# Dataframe for visualization
+df <- data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], 
+                 Sample = annot,
+                 include = paste(sce.all$Tissue, sce.all$Patient, sep = "_") %in%
+                   annot.high.quality)
+
+tsne.corrected.high.quality <- ggplot() + 
+  geom_point(data = df[df$include,],
+             aes(tsne1, tsne2, colour = Sample)) +
+  geom_point(data = df[!df$include,],
+             aes(tsne1, tsne2, colour = Sample), shape = 1, alpha = 0.5) +
+  scale_colour_manual(values = annot.col.high.quality) + 
+  theme_minimal()
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_corrected_highQuality.pdf", tsne.corrected.high.quality, width = 12, height = 7)
 ```
 
-## Marker gene expression
+# View clusters that were removed due to possible contaminations
 
-We next order cells along their spatial postion in the tissue and visualize known marker genes along this trajectory.
+In the final step, we remove groups of cells that present contaminations when sampling the tissues.
+For example these are squamous oesophagus cells found in the gastric sample.
 
 ```{r}
-# Removed "unknown" due to possible doublets
-corrected <- corrected[,cur_sce$cell_type != "Unknown"]
-cur_sce <- cur_sce[,cur_sce$cell_type != "Unknown"]
+sce.final <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 
-# Calculate pseudorank on corrected counts
-cur_rd <- t(corrected[1:10,])
-rownames(cur_rd) <- paste(cur_sce$Tissue, cur_sce$Patient, cur_sce$Barcode, sep = "_")
-colnames(cur_rd) <- paste("PC", 1:10)
-clusters <- cur_sce$cell_type
-names(clusters) <- rownames(cur_rd)
-PR <- PT(rd = cur_rd, clusters = cur_sce$cell_type, 
-         col_vector = colour_vector)
+# Create new colour vector
+annot <- paste(sce.all$Tissue, sce.all$Patient, sep = "_")
+annot[!(annot %in% annot.high.quality)] <- "exclude"
+annot[match(paste(sce.final$Sample[!sce.final$include], sce.final$Barcode[!sce.final$include], sep = "_"), paste(sce.all$Sample, sce.all$Barcode, sep = "_"))] <- "exclude"
 
-# Perform normalization across all cells
-cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
-cur_sce <- normalize(cur_sce, return_log = TRUE)
+# Grey out the cells that we are not using
+annot.col.high.quality <- c(annot.col, "black")
+names(annot.col.high.quality)[length(annot.col.high.quality)] <- "exclude"
 
-# Visualize marker genes in heatmap
-genes <- c("KRT4", "KRT5")
-for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),
-                                  order(PR[,"rank"], decreasing = TRUE)]
-colnames(for.heatmap) <- rownames(cur_rd)[order(PR[,"rank"], decreasing = TRUE)]
+# Dataframe for visualization
+df <- data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], 
+                 Sample = annot)
 
-pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/NE_heatmap.pdf",
-    width = 10, height = 2)
-pheatmap(for.heatmap, cluster_cols = FALSE, cluster_rows = FALSE, labels_row = genes,
-         color = viridis(100), annotation_col = 
-           data.frame(row.names = colnames(for.heatmap),
-                      cell_type = cur_sce$cell_type[order(PR[,"rank"], decreasing = TRUE)]),
-         annotation_colors = list(cell_type = colour_vector), 
-         show_colnames = FALSE) 
-dev.off()
+tsne.corrected.final <- ggplot() + 
+  geom_point(data = df[df$Sample == "exclude",],
+             aes(tsne1, tsne2, colour = Sample)) +
+  geom_point(data = df[df$Sample != "exclude",],
+             aes(tsne1, tsne2, colour = Sample)) +
+  scale_colour_manual(values = annot.col.high.quality) + 
+  theme_minimal()
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_corrected_final.pdf", tsne.corrected.final, width = 12, height = 7)
 ```
-
-# Stomach
-
-We will next visualize the tissue composition of stomach.
-
-## Dimensionality reduction
-
-```{r}
-cur_sce <- sce[,sce$Tissue == "GC"]
-
-# Split the samples to perform batch correction
-sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
-cur_sce <- do.call("cbind", sce.list)
-corrected <- batch.correction(sce.list)
-
-# Compute tSNE
-set.seed(12345)
-tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
-
-# Create colour vector
-colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
-names(colour_vector) <- unique(cur_sce$cell_type)
-colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[10]
-colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark blue"))(10)[10]
-colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[3]
-colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[6]
-colour_vector["Chief"] <- colorRampPalette(c("white", "dark blue"))(10)[6]
-colour_vector["Parietal"] <- colorRampPalette(c("white", "dark blue"))(10)[3]
-
-tsne.GC <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  cell_type = cur_sce$cell_type)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
-  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
-  scale_color_manual(values = colour_vector) + theme_minimal()
-
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/GC_tsne.pdf", tsne.GC, width = 6, height = 5)
-```
-
-## Marker genes expression
-
-Here, we perform pairwise DE testing to find cluster specific marker genes.
-
-```{r}
-# Remove non-expressed genes
-cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
-
-# Perform DE to find marker genes
-DE.genes <- multi.DE(sce = cur_sce, 
-                     conditions = cur_sce$cell_type,
-                     covariate = cur_sce$Patient,
-                     lfc = 0.5,
-                     FDR = 0.1)
-
-# Compare to scran
-markers <- marker.detection(cur_sce, clusters = cur_sce$cell_type)
-
-# Save as table
-write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S4.xlsx")
-```
-
-## Marker gene expression
-
-Here, we visualize marker gene expression in form of a heatmap
-
-```{r}
-genes <- c("MUC5AC", "KRT20", 
-           "PGA3", "PGA4", "PGA5", "LYZ", 
-           "GHRL", "CHGA", "CHGB", 
-           "MUC6", 
-           "GIF", "ATP4A",
-           "OLFM4", "LGR5")
-
-# Normalize across all cells
-cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
-cur_sce <- normalize(cur_sce, return_log = TRUE)
-
-# Visualize markers
-for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
-colnames(for.heatmap) <- paste(cur_sce$Barcode, cur_sce$Patient, sep = "_")
-
-# Order cells by cell-type
-ordering <- c(which(cur_sce$cell_type == "Undifferentiated"),
-               which(cur_sce$cell_type == "Foveolar_Intermediate"),
-               which(cur_sce$cell_type == "Foveolar_differentiated"),
-               which(cur_sce$cell_type == "Chief"),
-               which(cur_sce$cell_type == "Endocrine"),
-               which(cur_sce$cell_type == "Parietal"))
-
-pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/GC_heatmap.pdf", height = 7, width = 7)
-pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100), 
-         labels_row = genes, show_colnames = FALSE,
-         annotation_col = data.frame(row.names = colnames(for.heatmap)[ordering],
-                                     cell_type = cur_sce$cell_type[ordering]), 
-         annotation_colors = list(cell_type = colour_vector),
-         cluster_cols = FALSE)
-dev.off()
-```
-# Duodenum
-
-## Dimensionality reduction
-
-```{r}
-cur_sce <- sce[,sce$Tissue == "D2"]
-
-# Split the samples to perform batch correction
-sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
-cur_sce <- do.call("cbind", sce.list)
-corrected <- batch.correction(sce.list)
-
-# Compute tSNE
-set.seed(12345)
-tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
-
-# Create colour vector
-colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
-names(colour_vector) <- unique(cur_sce$cell_type)
-colour_vector["Enterocytes_Intermediate"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[6]
-colour_vector["Enterocytes_differentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[10]
-colour_vector["Dividing"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[3]
-colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[1]
-colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
-colour_vector["Paneth"] <- colorRampPalette(c("white", "seagreen4"))(10)[6]
-
-tsne.D2 <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  cell_type = cur_sce$cell_type)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
-  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
-  scale_color_manual(values = colour_vector) + theme_minimal()
-
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/D2_tsne.pdf", tsne.D2, width = 6, height = 5)
-```
-
-## Marker genes expression
-
-Here, we perform pairwise DE testing to find cluster specific marker genes.
-
-```{r}
-# Remove non-expressed genes
-cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
-
-# Perform DE to find marker genes
-DE.genes <- multi.DE(sce = cur_sce, 
-                     conditions = cur_sce$cell_type,
-                     covariate = cur_sce$Patient,
-                     lfc = 0.5,
-                     FDR = 0.1)
-
-# Save as table
-write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S5.xlsx")
-```
-
-## Marker gene expression
-
-```{r}
-genes <- c("OLFM4",
-           "LGR5",
-           "APOB",
-           "MUC2", 
-           "TFF3", 
-           "LYZ")
-
-# Normalize across all cells
-cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
-cur_sce <- normalize(cur_sce, return_log = TRUE)
-
-for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
-colnames(for.heatmap) <- paste(cur_sce$Barcode, cur_sce$Patient, sep = "_")
-
-# Order cells by cell-type
-ordering <- c(which(cur_sce$cell_type == "Undifferentiated"),
-               which(cur_sce$cell_type == "Dividing"),
-               which(cur_sce$cell_type == "Enterocytes_Intermediate"),
-               which(cur_sce$cell_type == "Enterocytes_differentiated"),
-               which(cur_sce$cell_type == "Goblet"),
-               which(cur_sce$cell_type == "Paneth"))
-
-pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/D2_heatmap.pdf", height = 7, width = 7)
-pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100), 
-         labels_row = genes, show_colnames = FALSE,
-         annotation_col = data.frame(row.names = colnames(for.heatmap)[ordering],
-                                     cell_type = cur_sce$cell_type[ordering]), 
-         annotation_colors = list(cell_type = colour_vector),
-         cluster_cols = FALSE)
-dev.off()
-```
-
-

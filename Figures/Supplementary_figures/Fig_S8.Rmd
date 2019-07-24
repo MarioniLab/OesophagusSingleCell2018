@@ -1,5 +1,5 @@
 ---
-title: "Figure S8: Cell type proportions in stem cells"
+title: "Figure S6: Similarity between BE and all other tissues"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -7,12 +7,14 @@ output:
     toc: true
     toc_depth: 2
 knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S8.html') })
+        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S6.html') })
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+Here, we perform additional analyses on the similarity between BE and all other tissues.
 
 # Read in the data
 
@@ -23,87 +25,107 @@ library(DropletUtils)
 library(openxlsx)
 library(Rtsne)
 library(pheatmap)
-library(cowplot)
-library(RColorBrewer)
-library(edgeR)
-library(ape)
 library(viridis)
-library(umap)
-library(reshape2)
+library(ape)
 source("../../Analysis/Functions/auxiliary.R")
+
 sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
-# Visualize stem-like cell cluster
+# Plot circular dendrogram of all clusters
 
-Here, we select the cluster that could contain stem-like cells and bisualize their cell proportions.
-
-```{r}
-# Select cluster 7
-cur_sce <- sce[,sce$include & sce$Global_cluster == 7]
-cur_sce <- cur_sce[,cur_sce$Tissue %in% c("GC", "BE", "D2", "SMG")]
-cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
-cur_sce <- normalize(cur_sce)
-
-# Perform batch correction
-sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
-sce.list <- sce.list[c(which(grepl("GC", names(sce.list))),
-                       which(grepl("BE", names(sce.list))),
-                       which(grepl("D2", names(sce.list))),
-                       which(grepl("SMG", names(sce.list))))]
-corrected <- batch.correction(sce.list)
-cur_sce <- do.call("cbind", sce.list)
-
-cur_mat <- table(cur_sce$cell_type, cur_sce$Tissue)
-cur_mat <- t(t(cur_mat)/colSums(cur_mat))
-cur_df <- melt(cur_mat)
-
-# Create colour vector for cell types
-colour_vector <- vector(length = nrow(cur_mat))
-names(colour_vector) <- rownames(cur_mat)
-colour_vector["Chief"] <- colorRampPalette(c("white", "dark blue"))(10)[6]
-colour_vector["Dividing"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[3]
-colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark blue"))(10)[10]
-colour_vector["Enterocytes_Intermediate"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[6]
-colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[10]
-colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[6]
-colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
-colour_vector["Mucous"] <- "saddlebrown"
-colour_vector["Paneth"] <- colorRampPalette(c("white", "seagreen4"))(10)[6]
-colour_vector["Serous"] <- "burlywood3"
-colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[1]
-colour_vector["Duct_intercalating"] <- "burlywood4"
-
-cell_type.barplot <- ggplot(cur_df) +
-  geom_col(aes(Var2, value, fill = Var1), colour = "black", lwd = 0.5) + 
-  scale_fill_manual(values = colour_vector)
-
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S8/Cell_type_proportion.pdf", cell_type.barplot, width = 7, height = 5)
-```
-
-# Visualize marker genes on heatmap
+To estimate the similarity between all cell types, we compute an averaged expression profile for each cell-type and perform hierarchical cluster analysis.
+Here, we calculate this on the non-batch corrected counts and thereby incorporating the inter-patient variation.
+We will first plot the dendogram across all genes, removing lowly expressed genes
 
 ```{r}
-genes <- c("OLFM4", "PTMA", "DMBT1", "RPL7", "RPS3", "RPL35")
+clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
+mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(sce))
+colnames(mat) <- unique(clusters)
 
-# Visualize gene expression in form of boxplots
-for.plot <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
-colnames(for.plot) <- paste(cur_sce$Tissue, cur_sce$cell_type, sep = "_")
-rownames(for.plot) <- genes
-df <- melt(as.matrix(for.plot))
-df$Tissue <- sapply(as.character(df$Var2), function(n){unlist(strsplit(n, "_"))[1]})
-df$Cell_type <- factor(sub("^[A-Z2]*_", "", as.character(df$Var2)), 
-                       levels = c("Undifferentiated", "Dividing", "Foveolar_Intermediate",
-                                  "Foveolar_differentiated", "Enterocytes_Intermediate",
-                                  "Endocrine", "Chief", "Goblet", "Paneth", 
-                                  "Serous", "Mucous", "Duct_intercalating"))
+for(i in unique(clusters)){
+  mat[,i] <- Matrix::rowMeans(logcounts(sce)[,clusters == i])
+}
 
-# jitter plots
-marker.p <- ggplot(df) + 
-  geom_jitter(aes(Cell_type, value, fill = Cell_type), 
-              shape = 21, width = 0.3, size = 1, stroke = 0.1) +
-  facet_grid(Var1 ~ Tissue,scales = "free_x") +
-  scale_fill_manual(values = colour_vector) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-ggsave(filename = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S8/Marker_genes.pdf", width = 10, height = 7)
+# Rename the matrix to contain the actual cell-type labels
+for(i in 1:ncol(mat)){
+  colnames(mat)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
+                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
+}
+
+# Remove lowly expressed genes
+mat <- mat[rowMeans(mat) > 0.1,]
+
+# Calculate euclidean distance on corrected counts
+dend <- hclust(as.dist(sqrt(1 - cor(mat, method = "spearman"))/2), method = "ward.D2")
+pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S6/Tree_all_genes.pdf", width = 10, height = 10)
+plot(as.phylo(dend), type = "fan", 
+     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+dev.off()
+
+# Plot PCA
+# Plot first two components
+pca <- prcomp(t(mat))
+pca.p <- ggplot(data.frame(Component1 = pca$x[,1],
+                  Component2 = pca$x[,2],
+                  tissue_type = sub("_[0-9]*$", "", unique(clusters)),
+                  cell_type = colnames(mat))) +
+  geom_point(aes(Component1, Component2, colour = tissue_type)) +
+  scale_colour_manual(values = metadata(sce)$colour_vector) + 
+  geom_text(aes(Component1, Component2, label = cell_type))
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S6/PCA_cell_types_all_genes.pdf", pca.p, width = 10, height = 10)
 ```
+
+Next we will use the same genes as the ones for batch correction.
+
+```{r}
+clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
+
+# Find highly variable genes
+sce.list <- split.sce(sce, unique(sce$Sample), colData.name = "Sample")
+
+HVG.genes <- lapply(sce.list, function(n){
+  HVG <- trendVar(n, use.spikes = FALSE)
+  decomposeVar(n, HVG)
+})
+  
+HVG.df <- do.call("combineVar", HVG.genes)
+HVG.df <- HVG.df[order(HVG.df$bio, decreasing = TRUE),]
+genes <- rownames(HVG.df)[1:1000]
+
+mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = 1000)
+colnames(mat) <- unique(clusters)
+
+for(i in unique(clusters)){
+  mat[,i] <- Matrix::rowMeans(logcounts(sce)[genes,clusters == i])
+}
+
+# Rename the matrix to contain the actual cell-type labels
+for(i in 1:ncol(mat)){
+  colnames(mat)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
+                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
+}
+
+# Calculate euclidean distance on corrected counts
+dend <- hclust(as.dist(sqrt(1 - cor(mat, method = "spearman"))/2), method = "ward.D2")
+pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S6/Tree_HVG.pdf", width = 10, height = 10)
+plot(as.phylo(dend), type = "fan", 
+     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+dev.off()
+
+# Plot PCA
+# Plot first two components
+pca <- prcomp(t(mat))
+pca.p <- ggplot(data.frame(Component1 = pca$x[,1],
+                  Component2 = pca$x[,2],
+                  tissue_type = sub("_[0-9]*$", "", unique(clusters)),
+                  cell_type = colnames(mat))) +
+  geom_point(aes(Component1, Component2, colour = tissue_type)) +
+  scale_colour_manual(values = metadata(sce)$colour_vector) + 
+  geom_text(aes(Component1, Component2, label = cell_type))
+
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S6/PCA_cell_types_HVG.pdf", pca.p, width = 10, height = 10)
+
+```
+
