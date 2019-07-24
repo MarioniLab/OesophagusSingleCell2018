@@ -1,5 +1,5 @@
 ---
-title: "Figure S2: Computational processing of all data"
+title: "Figure S4: Computational processing of all data"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -24,6 +24,7 @@ Finally, we will mark the high-quality batches and cells.
 library(scran)
 library(scater)
 library(DropletUtils)
+library(batchelor)
 library(openxlsx)
 library(Rtsne)
 source("../../Analysis/Functions/auxiliary.R")
@@ -49,7 +50,11 @@ sce.list <- lapply(sce.list, function(n){
 
 # Merge datasets
 sce.all <- do.call("cbind", sce.list)
-sce.all <- normalize(sce.all)
+
+# Normalize across all cells
+clusters <- quickCluster(sce.all, method = "igraph", irlba.args = c("work" = 100))
+sce.all <- computeSumFactors(sce.all, clusters=clusters)
+sce.all <- normalize(sce.all, return_log = TRUE)
 
 # Compute the top 1000 shared highly variable genes
 HVG.genes <- lapply(sce.list, function(n){
@@ -84,7 +89,7 @@ tsne.uncorrected <- ggplot(data.frame(tsne1 = tsne$Y[,1],
   scale_colour_manual(values = annot.col) + 
   theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_uncorrected.pdf", tsne.uncorrected, width = 12, height = 7)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S4/All_data_uncorrected.pdf", tsne.uncorrected, width = 12, height = 7)
 ```
 
 # Batch correction across tissues
@@ -118,7 +123,7 @@ tsne.corrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2],
                         Sample = annot)) + 
   geom_point(aes(tsne1, tsne2, colour = Sample)) + scale_colour_manual(values = annot.col) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_corrected.pdf", tsne.corrected, width = 12, height = 7)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S4/All_data_corrected.pdf", tsne.corrected, width = 12, height = 7)
 ```
 
 # High quality samples
@@ -149,7 +154,7 @@ tsne.corrected.high.quality <- ggplot() +
   scale_colour_manual(values = annot.col.high.quality) + 
   theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_corrected_highQuality.pdf", tsne.corrected.high.quality, width = 12, height = 7)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S4/All_data_corrected_highQuality.pdf", tsne.corrected.high.quality, width = 12, height = 7)
 ```
 
 # View clusters that were removed due to possible contaminations
@@ -181,5 +186,5 @@ tsne.corrected.final <- ggplot() +
   scale_colour_manual(values = annot.col.high.quality) + 
   theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S2/All_data_corrected_final.pdf", tsne.corrected.final, width = 12, height = 7)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S4/All_data_corrected_final.pdf", tsne.corrected.final, width = 12, height = 7)
 ```
