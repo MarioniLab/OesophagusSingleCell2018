@@ -100,14 +100,13 @@ For this, we will use the samples that contain a mix of different tissues first.
 ```{r}
 # Order sce objects for batch correction
 n <- names(sce.list)
-sce.list <- sce.list[c(which(grepl("NE", n)), which(grepl("GOJ", n)),
-                       which(grepl("SCJ", n)), which(grepl("GC", n)),
+sce.list <- sce.list[c(which(grepl("GOJ", n)), which(grepl("SCJ", n)),
+                       which(grepl("NE", n)), which(grepl("GC", n)),
                        which(grepl("BE", n)), which(grepl("D2", n)),
                        which(grepl("SMG", n)))]
 
 # Combine sce objects
 sce.all <- do.call("cbind", sce.list)
-sce.all <- normalize(sce.all)
   
 # Batch correction
 corrected <- batch.correction(sce.list)
