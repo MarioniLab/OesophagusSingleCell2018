@@ -69,7 +69,7 @@ tsne.NE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
   geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
   scale_color_manual(values = colour_vector) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
 ```
 
 ## Marker genes expression
@@ -96,10 +96,6 @@ write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_o
 We next order cells along their spatial postion in the tissue and visualize known marker genes along this trajectory.
 
 ```{r}
-# Removed "unknown" due to possible doublets
-corrected <- corrected[,cur_sce$cell_type != "Unknown"]
-cur_sce <- cur_sce[,cur_sce$cell_type != "Unknown"]
-
 # Calculate pseudorank on corrected counts
 cur_rd <- t(corrected[1:10,])
 rownames(cur_rd) <- paste(cur_sce$Tissue, cur_sce$Patient, cur_sce$Barcode, sep = "_")
@@ -119,7 +115,7 @@ for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),
                                   order(PR[,"rank"], decreasing = TRUE)]
 colnames(for.heatmap) <- rownames(cur_rd)[order(PR[,"rank"], decreasing = TRUE)]
 
-pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/NE_heatmap.pdf",
+pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/NE_heatmap.pdf",
     width = 10, height = 2)
 pheatmap(for.heatmap, cluster_cols = FALSE, cluster_rows = FALSE, labels_row = genes,
          color = viridis(100), annotation_col = 
@@ -165,7 +161,7 @@ tsne.GC <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
   geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
   scale_color_manual(values = colour_vector) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/GC_tsne.pdf", tsne.GC, width = 6, height = 5)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/GC_tsne.pdf", tsne.GC, width = 6, height = 5)
 ```
 
 ## Marker genes expression
@@ -218,7 +214,7 @@ ordering <- c(which(cur_sce$cell_type == "Undifferentiated"),
                which(cur_sce$cell_type == "Endocrine"),
                which(cur_sce$cell_type == "Parietal"))
 
-pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/GC_heatmap.pdf", height = 7, width = 7)
+pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/GC_heatmap.pdf", height = 7, width = 7)
 pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100), 
          labels_row = genes, show_colnames = FALSE,
          annotation_col = data.frame(row.names = colnames(for.heatmap)[ordering],
@@ -260,7 +256,7 @@ tsne.D2 <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
   geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
   scale_color_manual(values = colour_vector) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/D2_tsne.pdf", tsne.D2, width = 6, height = 5)
+ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/D2_tsne.pdf", tsne.D2, width = 6, height = 5)
 ```
 
 ## Marker genes expression
@@ -307,7 +303,7 @@ ordering <- c(which(cur_sce$cell_type == "Undifferentiated"),
                which(cur_sce$cell_type == "Goblet"),
                which(cur_sce$cell_type == "Paneth"))
 
-pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S4/D2_heatmap.pdf", height = 7, width = 7)
+pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/D2_heatmap.pdf", height = 7, width = 7)
 pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100), 
          labels_row = genes, show_colnames = FALSE,
          annotation_col = data.frame(row.names = colnames(for.heatmap)[ordering],
