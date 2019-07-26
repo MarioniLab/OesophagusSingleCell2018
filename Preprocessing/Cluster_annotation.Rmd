@@ -46,7 +46,7 @@ write.xlsx(df.annot, "../../../Dropbox (Cambridge University)/Oesophagus_single_
 After cluster annotation, we will save this in the colData slot of the SCE object.
 
 ```{r}
-annot <- read.xlsx("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/Cell_type_annotation_v4.xlsx")
+annot <- read.xlsx("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/Cell_type_annotation_v5.xlsx")
 
 # Link the tissue/cluster annotation of the single cell data to the annotation dataframe
 m <- match(paste(sce$Tissue, sce$Tissue_cluster, sep = "_"), 

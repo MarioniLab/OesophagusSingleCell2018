@@ -1,5 +1,5 @@
 ---
-title: "Figure S4: Characterization of all GI tissues"
+title: "Figure S5: Characterization of all GI tissues"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
