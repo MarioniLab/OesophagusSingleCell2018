@@ -160,6 +160,80 @@ func <- paste0("batchelor::multiBatchNorm(",
 sce.scaled <- eval( parse(text=func) )
 
 # Merge these datasets
+sce <- do.call("cbind", sce.scaled)
 
+# Remove non-expressed genes
+sce <- sce[Matrix::rowMeans(counts(sce)) > 0,]
+
+# Normalize across all cells
+# We provide the cell-types as clusters
+sce <- computeSumFactors(sce, clusters=paste(sce$Tissue, sce$cell_type, sep = "_"))
+sce <- normalize(sce, return_log = FALSE)
 ```
 
+We next repeat the analysis as above.
+First, we calculate a consensus transcriptome for each cell-type based on all genes.
+
+```{r}
+clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
+mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(sce))
+colnames(mat) <- unique(clusters)
+
+for(i in unique(clusters)){
+  mat[,i] <- Matrix::rowMeans(normcounts(sce)[,clusters == i])
+}
+
+# Rename the matrix to contain the actual cell-type labels
+for(i in 1:ncol(mat)){
+  colnames(mat)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
+                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
+}
+
+# Calculate spearman correlation between cell types
+dend <- hclust(as.dist(sqrt(1 - cor(log2(mat + 1), method = "spearman"))/2), method = "ward.D2")
+pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/Tree_all_genes.batch_scaled.pdf", width = 10, height = 10)
+plot(as.phylo(dend), type = "fan", 
+     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+dev.off()
+```
+
+Now with the HVGs.
+
+```{r}
+clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
+
+# Find highly variable genes
+# Load sce again to keep internal normalization intact
+sce.new <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+sce.new <- sce.new[,sce.new$include]
+sce.list <- split.sce(sce.new, unique(sce.new$Sample), colData.name = "Sample")
+
+HVG.genes <- lapply(sce.list, function(n){
+  HVG <- trendVar(n, use.spikes = FALSE)
+  decomposeVar(n, HVG)
+})
+  
+HVG.df <- do.call("combineVar", HVG.genes)
+HVG.df <- HVG.df[order(HVG.df$bio, decreasing = TRUE),]
+genes <- rownames(HVG.df)[1:1000]
+
+mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = 1000)
+colnames(mat) <- unique(clusters)
+
+for(i in unique(clusters)){
+  mat[,i] <- Matrix::rowMeans(normcounts(sce)[genes,clusters == i])
+}
+
+# Rename the matrix to contain the actual cell-type labels
+for(i in 1:ncol(mat)){
+  colnames(mat)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
+                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
+}
+
+# Calculate spearman correlation between cell types
+dend <- hclust(as.dist(sqrt(1 - cor(log2(mat + 1), method = "spearman"))/2), method = "ward.D2")
+pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/Tree_HVG.batch_scaled.pdf", width = 10, height = 10)
+plot(as.phylo(dend), type = "fan", 
+     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+dev.off()
+```
