@@ -36,7 +36,7 @@ Here, we visualize the expression of marker genes in gland cells as well as stro
 
 ```{r}
 # Read in our data
-sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+sce <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
 
 # Select gland cells
 cur_sce <- sce[,sce$Tissue == "SMG"]
@@ -49,13 +49,13 @@ corrected <- batch.correction(sce.list)
 
 # Merge sce objects
 cur_sce <- do.call("cbind", sce.list)
-cur_sce <- normalize(cur_sce)
 
 # Create colour vecotr for glands
 colour_vector <-  vector(length = length(unique(cur_sce$cell_type)))
 names(colour_vector) <- unique(cur_sce$cell_type)
 colour_vector["Fibroblast"] <- "grey40"
 colour_vector["Mucous"] <- "saddlebrown"
+colour_vector["Doublets.unknown"] <- "white"
 colour_vector["Serous"] <- "burlywood3"
 colour_vector["Endothelial"] <- "grey60"
 colour_vector["Nonepithelial"] <- "grey80"
@@ -67,9 +67,13 @@ colour_vector["Dendritic"] <- "grey20"
 # Remove non-expressed genes
 cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
 
-genes <- c("KRT7", "TFF3", "MUC5B", "KRT8", "CDH1", "SLPI", 
-           "ACTA2", "MMP7", "SOX9", "MKI67", "KRT23", "KRT14",
-           "OLFM4", "KRT5")
+genes <- c("CDH1", "TFF3", "MUC5B", "AGR2", "KRT8", "SLPI", 
+           "MMP7", "KRT7", "SOX9", "KRT23", "ACTA2", "KRT5",
+           "MKI67", "OLFM4")
+
+# We first normalize gene expression across all selected cells
+cur_sce <- computeSumFactors(cur_sce, clusters=cur_sce$cell_type)
+cur_sce <- normalize(cur_sce, return_log = TRUE)
 
 # Remove somatic cells
 for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
@@ -82,7 +86,7 @@ euc.dist <- dist(t(corrected), method = "euclidean")
 patient_vector <- c("dark red", "dark blue", "dark green")
 names(patient_vector) <- c("Patient10", "Patient11", "Patient13")
 
-pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S3/SMG_heatmap_all.pdf", height = 7, width = 8)
+pdf(file = "../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S2/SMG_heatmap_all.pdf", height = 7, width = 8)
 pheatmap(for.heatmap, cluster_rows = FALSE, color = viridis(100), 
          labels_row = genes, show_colnames = FALSE, clustering_distance_cols = euc.dist,
          annotation_col = data.frame(row.names = colnames(for.heatmap),
