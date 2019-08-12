@@ -200,45 +200,36 @@ sce <- sce[genes,]
 
 # Exclude contaminating cells
 sce <- sce[,sce$include]
-sce <- normalize(sce)
 
 # Generate list of SCE object for batch correction
-sce.list <- split.sce(sce, unique(sce$Patient), colData.name = "Patient")
-sce.list <- lapply(sce.list, function(n){split.sce(n, unique(n$Tissue), colData.name = "Tissue")})
-sce.list <- unlist(sce.list)
-
-# Sort list for mapping
-sce.list <- sce.list[c("Patient2.NE", "Patient7.NE", "Patient8.NE", "Patient10.NE",
-                       "Patient2.GOJ", "Patient8.GOJ", "Patient10.GOJ", "Patient13.GOJ",
-                       "Patient3.SCJ", "Patient7.SCJ", "Patient9.SCJ", 
-                       "Patient2.GC", "Patient7.GC", "Patient3.GC", "Patient13.GC", 
-                       "Patient3.BE", "Patient7.BE", "Patient9.BE",
-                       "Patient7.D2", "Patient8.D2", "Patient9.D2", "Patient12.D2",
-                       "Patient10.SMG", "Patient11.SMG", "Patient13.SMG")]
+sce.list <- split.sce(sce, unique(sce$Sample), colData.name = "Sample")
 
 # Split Owen data into list
 owen.list <- split.sce(sce.owen, unique(sce.owen$patient), colData.name = "patient")
 owen.list <- lapply(owen.list, function(n){split.sce(n, unique(n$tissue), colData.name = "tissue")})
 owen.list <- unlist(owen.list)
 
-# Remove batches that contain few than 10 cells
+# Remove batches that contain fewer than 10 cells
 owen.list <- owen.list[lapply(owen.list, ncol) > 10]
 
+# We remove PtB.Oesophagus and PtB.Gastric
+
 # Sort list for mapping
+# We exclude the brain cells since they would disrupt the mapping process
+# They could be included if we had the batch information
 owen.list <- owen.list[c("PtA.Oesophagus", "PtD.Oesophagus", "PtE.Oesophagus", "PtF.Oesophagus",
                          "PtA.Gastric", "PtC.Gastric", "PtD.Gastric",
                          "PtA.Barrett's", "PtC.Barrett's", "PtD.Barrett's",  "PtB.Barrett's",
-                         "PtA.Duodenum", "PtC.Duodenum", "PtD.Duodenum", "PtB.Duodenum",
-                         "Control.Brain")]
+                         "PtA.Duodenum", "PtC.Duodenum", "PtD.Duodenum", "PtB.Duodenum")]
 
 # Collect tissue information
 tissues <- unlist(lapply(sce.list, function(n){n$Tissue}))
 tissues.all <- c(tissues, as.character(unlist(lapply(owen.list, function(n){n$tissue}))))
 
 # Add Owen data to sce
-sce.list <- c(sce.list, owen.list)
+sce.list.all <- c(sce.list, owen.list)
 set.seed(12345)
-corrected <- batch.correction(sce.list)
+corrected <- batch.correction(sce.list.all)
 
 # Visualize results
 set.seed(123)
