@@ -133,9 +133,20 @@ owen.data <- owen.data[!grepl("ERCC", rownames(owen.data)),]
 sce.owen <- SingleCellExperiment(assays = list(counts = as(as.matrix(owen.data), "dgCMatrix")),
                                  colData = as.data.frame(owen.meta))
 # Remove low quality cells
+# We will first check which cells were not assigned to specific clusters
+sum(is.na(colData(sce.owen)$all_k8) & (!is.na(colData(sce.owen)$duodenum_k4) | 
+                                         !is.na(colData(sce.owen)$gastric_k3) | 
+                                         !is.na(colData(sce.owen)$oesophagus_k4) |
+                                         !is.na(colData(sce.owen)$barrett_k4) | 
+                                         !is.na(colData(sce.owen)$normal_oesophagus_k5) | 
+                                         !is.na(colData(sce.owen)$gland_cells_k3)))
+
+table(sce.owen$tissue[apply(colData(sce.owen)[,6:12], 1, function(n){sum(is.na(n))/7}) == 1])
+table(sce.owen$tissue[apply(colData(sce.owen)[,6:12], 1, function(n){sum(is.na(n))/7}) != 1])
+
 # The coloumn data contains the cluster ID of each cell
 # If the cell is not part of any cluster, we remove them
-sce.owen <- sce.owen[,apply(colData(sce.owen), 1, function(n){sum(is.na(n))/7}) != 1]
+sce.owen <- sce.owen[,apply(colData(sce.owen)[,6:12], 1, function(n){sum(is.na(n))/7}) != 1]
 
 # Visualize quality
 sce.owen <- calculateQCMetrics(sce.owen)
@@ -149,10 +160,32 @@ ggplot(as.data.frame(colData(sce.owen))) +
 sce.owen <- sce.owen[,colData(sce.owen)$total_features_by_counts > 1000]
 
 # Normalize the data
-cluster <- quickCluster(sce.owen, method = "igraph", irlba.args = c("work" = 100), 
-                         max.size = 2000, min.size = 50)
+cluster <- quickCluster(sce.owen, method = "igraph", irlba.args = c("work" = 100))
 sce.owen <- computeSumFactors(sce.owen, clusters=cluster)
 sce.owen <- normalize(sce.owen, return_log = TRUE)
+
+# Visualize owen data
+sce.owen <- runTSNE(sce.owen)
+
+ggplot(data.frame(tsne1 = reducedDims(sce.owen)$TSNE[,1],
+                  tsne2 = reducedDims(sce.owen)$TSNE[,2],
+                  info = sce.owen$tissue)) +
+  geom_point(aes(tsne1, tsne2, colour = info))
+
+ggplot(data.frame(tsne1 = reducedDims(sce.owen)$TSNE[,1],
+                  tsne2 = reducedDims(sce.owen)$TSNE[,2],
+                  info = sce.owen$patient)) +
+  geom_point(aes(tsne1, tsne2, colour = info))
+
+ggplot(data.frame(tsne1 = reducedDims(sce.owen)$TSNE[,1],
+                  tsne2 = reducedDims(sce.owen)$TSNE[,2],
+                  info = as.factor(sce.owen$all_k8))) +
+  geom_point(aes(tsne1, tsne2, colour = info))
+
+ggplot(data.frame(tsne1 = reducedDims(sce.owen)$TSNE[,1],
+                  tsne2 = reducedDims(sce.owen)$TSNE[,2],
+                  info = as.factor(sce.owen$gland_cells_k3))) +
+  geom_point(aes(tsne1, tsne2, colour = info))
 ```
 
 # Map owen data onto our data
