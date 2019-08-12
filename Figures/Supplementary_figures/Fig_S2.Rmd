@@ -302,8 +302,8 @@ gland.groups.tissues <- ggplot() +
         axis.line = element_line(colour = "grey"))
 
 # Save plots
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S3/All_owen_data.pdf", owen.all.tissues, width = 6, height = 5)
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S3/Glandlike_owen_data.pdf", gland.groups.tissues, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S2/All_owen_data.pdf", owen.all.tissues, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S2/Glandlike_owen_data.pdf", gland.groups.tissues, width = 6, height = 5)
 ```
 
 # Comparison to HCA data
