@@ -1,4 +1,5 @@
 *.html
-.Rhistory
+*.Rhistory
 *.err
 *.log
+*.DS_Store

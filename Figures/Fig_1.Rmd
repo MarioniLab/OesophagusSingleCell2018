@@ -6,8 +6,6 @@ output:
   html_document:
     toc: true
     toc_depth: 2
-knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_1.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -29,7 +27,7 @@ library(viridis)
 source("../Analysis/Functions/auxiliary.R")
 
 # Read in the normalized and batch-corrected reads
-sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+sce <- readRDS("../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
 # Visualize gland cells
@@ -77,7 +75,7 @@ p.smg <- ggplot(data.frame(tsne1 = smg_tsne$Y[,1],
         panel.background = element_blank(), 
         axis.line = element_line(colour = "grey"))
 
-ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_1/SMG_cells.pdf", 
+ggsave("../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_1/SMG_cells.pdf", 
        p.smg, 
        width = 8, height = 7)
 ```
@@ -109,7 +107,7 @@ ggplot(data.frame(tsne1 = smg_tsne$Y[,1],
   scale_colour_viridis()
 
 # Save as table
-write.xlsx(DE.genes, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S2.xlsx")
+write.xlsx(DE.genes, file = "../../../Dropbox (Personal)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S2.xlsx")
 ```
 
 # Heatmap visualizing SMG marker genes
@@ -141,7 +139,8 @@ euc.dist <- dist(t(cur_corrected), method = "euclidean")
 patient_vector <- c("dark red", "dark blue", "dark green")
 names(patient_vector) <- c("Patient10", "Patient11", "Patient13")
 
-pdf(file = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_1/SMG_heatmap_lognorm.pdf", height = 7, width = 8)
+dev.off()
+pdf(file = "../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_1/SMG_heatmap_lognorm.pdf", height = 7, width = 8)
 pheatmap(for.heatmap, cluster_rows = FALSE, color = viridis(100), 
          labels_row = genes, show_colnames = FALSE, clustering_distance_cols = euc.dist,
          annotation_col = data.frame(row.names = colnames(for.heatmap),

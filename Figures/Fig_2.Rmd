@@ -6,8 +6,6 @@ output:
   html_document:
     toc: true
     toc_depth: 2
-knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_2.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -32,173 +30,40 @@ library(ape)
 library(viridis)
 library(umap)
 source("../Analysis/Functions/auxiliary.R")
-sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+sce <- readRDS("../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
+
+# Exclude contaminating cells
+sce <- sce[,sce$include]
 ```
 
-# Visualize GC, GOJ, BE and SCJ samples
+# Plot tsne
 
-Here we perform differential expression (DE) analysis between the epithelial tissues of the GC, GOJ, SCJ, BE and NE samples.
+Here, we visualize the batch-corrected counts using tsne.
 
 ```{r}
-# Select tissues to test
-#cur_corrected <- metadata(sce)$corrected[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ")]
-cur_sce <- sce[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ")]
-cur_sce <- normalize(cur_sce)
-
-# Perform batch correction
-sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
-sce.list <- sce.list[c(which(grepl("NE", names(sce.list))),
-                       which(grepl("GOJ", names(sce.list))),
-                       which(grepl("SCJ", names(sce.list))),
-                       which(grepl("GC", names(sce.list))),
-                       which(grepl("BE", names(sce.list))))]
+# Batch correction
+sce.list <- split.sce(sce, unique(sce$Sample), colData.name = "Sample")
 corrected <- batch.correction(sce.list)
-cur_sce <- do.call("cbind", sce.list)
+sce <- do.call("cbind", sce.list)
 
 # Compute new tSNE
 set.seed(11111)
-tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
-reducedDims(cur_sce)$TSNE <- tsne$Y
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 250)
+reducedDims(sce)$TSNE <- tsne$Y
 
-# Visualize tSNEs
-# Tissue
-p.all.cells <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
-                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
-                  tissue = colData(cur_sce)$Tissue)) + 
-  geom_point(aes(tsne1, tsne2), colour = "black", size = 2) + 
-  geom_point(aes(tsne1, tsne2, colour = tissue)) + 
-  scale_color_manual(values = metadata(cur_sce)$colour_vector) + 
+# Visualize tsne
+p.all.cells <- ggplot(data.frame(tsne1 = reducedDims(sce)$TSNE[,1],
+                  tsne2 = reducedDims(sce)$TSNE[,2],
+                  tissue = colData(sce)$Tissue)) + 
+  geom_point(aes(tsne1, tsne2), colour = "black", size = 1) + 
+  geom_point(aes(tsne1, tsne2, colour = tissue), size = 0.5) + 
+  scale_color_manual(values = metadata(sce)$colour_vector) + 
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
         panel.background = element_blank(), 
         axis.line = element_line(colour = "grey"))
 
-# Tissue typse
-p.all.cells.tissue_type <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
-                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
-                  tissue = colData(cur_sce)$tissue_type)) +
-  geom_point(aes(tsne1, tsne2), colour = "black", size = 2) + 
-  geom_point(aes(tsne1, tsne2, colour = tissue)) + 
-  scale_color_manual(values = c("dark blue", "dark red")) + 
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        panel.background = element_blank(), 
-        axis.line = element_line(colour = "grey"))
-
-# Cell type
-colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
-names(colour_vector) <- unique(cur_sce$cell_type)
-colour_vector["Unknown"] <- "grey20"
-colour_vector["Suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[10]
-colour_vector["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
-colour_vector["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
-colour_vector["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[1]
-colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[10]
-colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark blue"))(10)[10]
-colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[3]
-colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[6]
-colour_vector["Chief"] <- colorRampPalette(c("white", "dark blue"))(10)[6]
-colour_vector["Parietal"] <- colorRampPalette(c("white", "dark blue"))(10)[3]
-colour_vector["Foveolar_Intermediate/goblet"] <- "black"
-colour_vector["Endocrine/Undifferentiated"] <- "grey60"
-colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
-
-p.all.cells.cell_type <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
-                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
-                  tissue = colData(cur_sce)$cell_type)) +
-  geom_point(aes(tsne1, tsne2), colour = "black", size = 2) + 
-  geom_point(aes(tsne1, tsne2, colour = tissue)) + 
-  scale_color_manual(values = colour_vector) + 
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        panel.background = element_blank(), 
-        axis.line = element_line(colour = "grey"))
-
-# Visualize patient
-# Colouring for patient
-colour_vector <- vector(length = length(unique(cur_sce$Patient)))
-names(colour_vector) <- unique(cur_sce$Patient)
-colour_vector <- brewer.pal(7, "Accent")
-
-p.all.cells.patient <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
-                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
-                  tissue = colData(cur_sce)$Patient)) +
-  geom_point(aes(tsne1, tsne2), colour = "black", size = 2) + 
-  geom_point(aes(tsne1, tsne2, colour = tissue)) + 
-  scale_color_manual(values = colour_vector) + 
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        panel.background = element_blank(), 
-        axis.line = element_line(colour = "grey"))
-
-# Save tSNEs
-final <- plot_grid(p.all.cells, p.all.cells.tissue_type, p.all.cells.cell_type, p.all.cells.patient,
-                   ncol = 2, nrow = 2)
-ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/GC_NE_tSNEs.pdf", width = 15, height = 15)
-```
-
-# Differential expression analysis
-
-Here we berform differential expression analysis between NE and squamous cells of GOJ, GC and columnar cells of GC, NE and squamous cells of SCJ, BE and columnar cells of SCJ.
-For this, we will sum the raw counts for each gene across all cells per tissue and per patient. 
-We then use edgeR on these pseudo-bulk samples to test for changes in mean expression.
-
-```{r}
-# Define conditions to test
-# First two slots are tissues and last slot is cell-types to compare
-cond <- list(c("NE", "GOJ", "Basal-Intermediate-Suprabasal"),
-             c("GC", "GOJ", "Foveolar_Intermediate-Foveolar_differentiated-Endocrine-Undifferentiated-Chief"),
-             c("BE", "SCJ", "Foveolar_differentiated-Foveolar_Intermediate-Undifferentiated-Dividing"),
-             c("NE", "SCJ", "Basal-Intermediate-Suprabasal"))
-
-# Initialize list to store results
-out <- list()
-
-for(i in 1:length(cond)){
-  tissue1 <- cond[[i]][1]
-  tissue2 <- cond[[i]][2]
-  cell_types <- unlist(strsplit(cond[[i]][3], "-"))
-  
-  # Select cells
-  sce_to_test <- cur_sce[,(cur_sce$Tissue == tissue1 | 
-                             cur_sce$Tissue == tissue2) &
-                           cur_sce$cell_type %in% cell_types]
-  
-  # Remove non-expressed genes 
-  sce_to_test <- sce_to_test[Matrix::rowSums(counts(sce_to_test)) > 0,]
-  
-  # Peform DE
-  cur_out <- DE.edgeR(sce = sce_to_test,
-                      conditions = sce_to_test$Tissue,
-                      covariate = sce_to_test$Patient,
-                      lfc = 0.5,
-                      FDR = 0.1)
-  
-  # Calculate the percentage of DE genes
-  print(nrow(do.call("rbind", cur_out))/nrow(sce_to_test))
-  
-  # Save in output list
-  out[[paste(tissue1, "vs", tissue2, sep = "_")]] <- cur_out
-}
-
-```
-
-# Visualize KRT7 expression
-
-Here, we visualize the expression of KRT7 in the tissues analysed above.
-
-```{r}
-KRT7 <- data.frame(KRT7 = logcounts(cur_sce)["ENSG00000135480",],
-                   tissue = factor(cur_sce$Tissue, levels = c("NE", "GOJ", "GC", "SCJ", "BE")),
-                   tissue_type = factor(cur_sce$tissue_type, levels = c("Squamous", "Columnar")))
-
-p.KRT7 <- ggplot(KRT7) +
-  geom_boxplot(aes(tissue, KRT7, fill = tissue_type, colour = tissue_type)) + 
-  scale_colour_manual(values = c("dark red", "dark blue")) +
-  scale_fill_manual(values = c(adjustcolor("dark red", alpha.f = 0.5), 
-                               adjustcolor("dark blue", alpha.f = 0.5)))
-
-ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/KRT7_boxplots.pdf", width = 7, height = 4)
+ggsave("../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_2/All_cells.pdf", p.all.cells, width = 7, height = 5)
 ```
 
 # Plot circular dendrogram of all clusters
@@ -208,11 +73,11 @@ To estimate the similarity between all cell types, we compute an averaged expres
 ```{r}
 # We will perform this analysis on the corrected and uncorrected counts (uncorrected in supplements)
 clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
-mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(metadata(sce)$corrected))
+mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(corrected))
 colnames(mat) <- unique(clusters)
 
 for(i in unique(clusters)){
-  mat[,i] <- rowMeans(metadata(sce)$corrected[,clusters == i])
+  mat[,i] <- rowMeans(corrected[,clusters == i])
 }
 
 # Rename the matrix to contain the actual cell-type labels
@@ -223,7 +88,8 @@ for(i in 1:ncol(mat)){
 
 # Calculate euclidean distance on corrected counts
 dend <- hclust(dist(t(mat), method = "euclidean"), method = "ward.D2")
-pdf("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_2/Tree_corrected_counts.pdf", width = 10, height = 10)
+dev.off()
+pdf("../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_2/Tree_corrected_counts.pdf", width = 10, height = 10)
 plot(as.phylo(dend), type = "fan", 
      tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
 dev.off()

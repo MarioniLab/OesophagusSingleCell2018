@@ -6,8 +6,6 @@ output:
   html_document:
     toc: true
     toc_depth: 2
-knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_3.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -33,7 +31,7 @@ library(viridis)
 library(umap)
 library(reshape2)
 source("../Analysis/Functions/auxiliary.R")
-sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+sce <- readRDS("../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
 # Perform dimensionality reduction for GC and BE together
@@ -104,8 +102,8 @@ tsne_BE_GC.cell_type <- ggplot(data.frame(tsne1 = tsne$Y[,1],
   scale_colour_manual(values = colour_vector)
 
 # Save figures
-ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_GC_tissue.pdf", UMAP_BE_GC.tissue, width = 7, height = 5)
-ggsave("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_GC_cell_type.pdf", UMAP_BE_GC.cell_type, width = 7, height = 5)
+ggsave("../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_GC_tissue.pdf", UMAP_BE_GC.tissue, width = 7, height = 5)
+ggsave("../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_GC_cell_type.pdf", UMAP_BE_GC.cell_type, width = 7, height = 5)
 ```
 
 # Differential expression testing between cell types
@@ -203,7 +201,7 @@ pheatmap(cur_mat,
          show_colnames = FALSE, gaps_row = 20)
 
 # Save results
-write.xlsx(out, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S7.xlsx")
+write.xlsx(out, file = "../../../Dropbox (Personal)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S7.xlsx")
 ```
 
 
@@ -293,7 +291,7 @@ pheatmap(cur_mat[,order(cur_dat$cell_type, cur_dat$tissue)],
          show_colnames = FALSE, cluster_cols = FALSE)
 
 # Save results
-write.xlsx(out_spec, file = "../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S8.xlsx")
+write.xlsx(out_spec, file = "../../../Dropbox (Personal)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S8.xlsx")
 ```
 
 # Visualize marker genes
@@ -335,7 +333,8 @@ ind_order <- c(which(cur_sce$Tissue == "GC" & cur_sce$cell_type == "Undifferenti
                which(cur_sce$Tissue == "BE" & cur_sce$cell_type == "Foveolar_differentiated"))
 
 # Heatmap
-pdf("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/Heatmap_marker_genes.pdf", 
+dev.off()
+pdf("../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_3/Heatmap_marker_genes.pdf", 
     width = 10, height = 5)
 pheatmap(for.plot[,ind_order], cluster_rows = FALSE, cluster_cols = FALSE,
          color = viridis(100), labels_row = genes, 
@@ -347,7 +346,7 @@ pheatmap(for.plot[,ind_order], cluster_rows = FALSE, cluster_cols = FALSE,
          show_colnames = FALSE)
 dev.off()
 
-pdf("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/Heatmap_marker_genes.scaled.pdf", 
+pdf("../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_3/Heatmap_marker_genes.scaled.pdf", 
     width = 10, height = 5)
 pheatmap(for.plot[,ind_order], cluster_rows = FALSE, cluster_cols = FALSE,
          color = colorRampPalette(c("dark blue", "blue", "white", "red", "dark red"))(100), 
@@ -410,11 +409,11 @@ GC_HNF4A <- ggplot() +
              aes(PT, value, colour = HNF4A), size = 2) +
   scale_colour_viridis(limits = c(0, 4.2))
 
-ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/GC_pseudotime.pdf", 
+ggsave(filename = "../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_3/GC_pseudotime.pdf", 
        plot = GC.PT, width = 7, height = 2)
-ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/GC_MYC.pdf", 
+ggsave(filename = "../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_3/GC_MYC.pdf", 
        plot = GC_MYC, width = 7, height = 2)
-ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/GC_HNF4A.pdf", 
+ggsave(filename = "../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_3/GC_HNF4A.pdf", 
        plot = GC_HNF4A, width = 7, height = 2)
 
 # Select BE
@@ -460,11 +459,11 @@ BE_HNF4A <- ggplot() +
              aes(PT, value, colour = HNF4A), size = 2) +
   scale_colour_viridis(limits = c(0, 4.2))
 
-ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_pseudotime.pdf", 
+ggsave(filename = "../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_pseudotime.pdf", 
        plot = BE.PT, width = 7, height = 2)
-ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_MYC.pdf", 
+ggsave(filename = "../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_MYC.pdf", 
        plot = BE_MYC, width = 7, height = 2)
-ggsave(filename = "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_HNF4A.pdf", 
+ggsave(filename = "../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_HNF4A.pdf", 
        plot = BE_HNF4A, width = 7, height = 2)
 
 ```
