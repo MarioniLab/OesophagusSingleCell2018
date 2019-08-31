@@ -31,7 +31,7 @@ source("../../Analysis/Functions/auxiliary.R")
 Here, I will use different sets of genes to show that the batch correction is independent from the chosen gene set.
 
 ```{r batch-correction}
-all_sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+all_sce <- readRDS("../../../../Dropbox (Personal)//Oesophagus_single_cell/All_corrected_sce.rds")
 all_sce <- all_sce[,all_sce$include]
 sce.list <- split.sce(sce = all_sce, groups = unique(all_sce$Sample), colData.name = "Sample")
 
@@ -94,10 +94,72 @@ plot(as.phylo(dend_2), type = "fan",
 dev.off()
 ```
 
+Next, I will only correct across the different patients.
+
+```{r}
+all_sce <- readRDS("../../../../Dropbox (Personal)//Oesophagus_single_cell/All_corrected_sce.rds")
+all_sce <- all_sce[,all_sce$include]
+sce.list <- split.sce(sce = all_sce, groups = unique(all_sce$Patient), colData.name = "Patient")
+
+# Correctly normalize for each patient
+sce.list <- lapply(sce.list, function(n){
+  cur_cluster <- quickCluster(n, method = "igraph", irlba.args = c("work" = 100))
+  n <- computeSumFactors(n, clusters=cur_cluster)
+  n <- normalize(n, return_log = TRUE)
+  n
+})
+
+# Order list
+sce.list <- sce.list[c("Patient2", "Patient3", "Patient7", "Patient9", "Patient8", "Patient10", "Patient12", "Patient11", "Patient13")]
+
+# Combine sce objects
+all_sce <- do.call("cbind", sce.list)
+
+# Perform batch correction
+corrected <- batch.correction(sce.list)
+
+set.seed(1234)
+tsne <- Rtsne(t(corrected), pca = FALSE, perxplexity = 100)
+
+p.tsne.patient.correction <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  clusters = as.factor(colData(all_sce)$Tissue))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
+  scale_colour_manual(values = metadata(all_sce)$colour_vector)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/BatchCorrectionValidation/tsne_patient_correction.pdf", 
+       p.tsne.patient.correction, width = 12, height = 7)
+
+# dendogram analysis
+clusters <- paste(colData(all_sce)$Tissue, colData(all_sce)$Tissue_cluster, sep = "_")
+mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(corrected))
+colnames(mat) <- unique(clusters)
+
+for(i in unique(clusters)){
+  mat[,i] <- rowMeans(corrected[,clusters == i])
+}
+
+# Rename the matrix to contain the actual cell-type labels
+for(i in 1:ncol(mat)){
+  colnames(mat)[i] <- unique(all_sce$cell_type[all_sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
+                                 all_sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
+}
+
+# Calculate euclidean distance on corrected counts
+dend <- hclust(dist(t(mat), method = "euclidean"), method = "ward.D2")
+pdf("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/BatchCorrectionValidation/Tree_patient_correction.pdf", width = 10, height = 10)
+plot(as.phylo(dend), type = "fan", 
+     tip.color = metadata(all_sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+dev.off()
+```
+
 Next, I will use scanorama and Seurat to perform the same mapping strategy.
 Start with scanorama.
 
 ```{r}
+all_sce <- readRDS("../../../../Dropbox (Personal)//Oesophagus_single_cell/All_corrected_sce.rds")
+all_sce <- all_sce[,all_sce$include]
+sce.list <- split.sce(sce = all_sce, groups = unique(all_sce$Sample), colData.name = "Sample")
+
 library(reticulate)
 scanorama <- import('scanorama')
 
@@ -127,6 +189,10 @@ This doesn't seem to work.
 So I'll try the Seurat implementation instead.
 
 ```{r}
+all_sce <- readRDS("../../../../Dropbox (Personal)//Oesophagus_single_cell/All_corrected_sce.rds")
+all_sce <- all_sce[,all_sce$include]
+sce.list <- split.sce(sce = all_sce, groups = unique(all_sce$Sample), colData.name = "Sample")
+
 library(Seurat)
 
 # List of highly variable genes

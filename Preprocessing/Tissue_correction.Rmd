@@ -29,7 +29,7 @@ source("../Analysis/Functions/auxiliary.R")
 # Batch correction across tissues
 
 ```{r batch-correction}
-sce.list <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/High_quality_sce.rds")
+sce.list <- readRDS("../../../Dropbox (Personal)/Oesophagus_single_cell/High_quality_sce.rds")
 tissue.list <- list()
 
 for(i in c("NE", "GC", "BE", "GOJ", "SCJ", "D2", "SMG")){
