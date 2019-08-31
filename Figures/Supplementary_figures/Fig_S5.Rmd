@@ -6,8 +6,6 @@ output:
   html_document:
     toc: true
     toc_depth: 2
-knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S4.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -29,7 +27,7 @@ library(pheatmap)
 library(viridis)
 source("../../Analysis/Functions/auxiliary.R")
 
-sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+sce <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
 
 # Remove contaminating cell-types
 sce <- sce[,sce$include]
@@ -69,7 +67,7 @@ tsne.NE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
   geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
   scale_color_manual(values = colour_vector) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
 ```
 
 ## Marker genes expression
@@ -88,7 +86,7 @@ DE.genes <- multi.DE(sce = cur_sce,
                      FDR = 0.1)
 
 # Save as table
-write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S3.xlsx")
+write.xlsx(DE.genes, file = "../../../../Dropbox (Personal)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S3.xlsx")
 ```
 
 ## Marker gene expression
@@ -115,7 +113,7 @@ for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),
                                   order(PR[,"rank"], decreasing = TRUE)]
 colnames(for.heatmap) <- rownames(cur_rd)[order(PR[,"rank"], decreasing = TRUE)]
 
-pdf("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/NE_heatmap.pdf",
+pdf("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/NE_heatmap.pdf",
     width = 10, height = 2)
 pheatmap(for.heatmap, cluster_cols = FALSE, cluster_rows = FALSE, labels_row = genes,
          color = viridis(100), annotation_col = 
@@ -161,7 +159,7 @@ tsne.GC <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
   geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
   scale_color_manual(values = colour_vector) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/GC_tsne.pdf", tsne.GC, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/GC_tsne.pdf", tsne.GC, width = 6, height = 5)
 ```
 
 ## Marker genes expression
@@ -183,7 +181,7 @@ DE.genes <- multi.DE(sce = cur_sce,
 markers <- marker.detection(cur_sce, clusters = cur_sce$cell_type)
 
 # Save as table
-write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S4.xlsx")
+write.xlsx(DE.genes, file = "../../../../Dropbox (Personal)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S4.xlsx")
 ```
 
 ## Marker gene expression
@@ -214,7 +212,7 @@ ordering <- c(which(cur_sce$cell_type == "Undifferentiated"),
                which(cur_sce$cell_type == "Endocrine"),
                which(cur_sce$cell_type == "Parietal"))
 
-pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/GC_heatmap.pdf", height = 7, width = 7)
+pdf(file = "../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/GC_heatmap.pdf", height = 7, width = 7)
 pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100), 
          labels_row = genes, show_colnames = FALSE,
          annotation_col = data.frame(row.names = colnames(for.heatmap)[ordering],
@@ -256,7 +254,7 @@ tsne.D2 <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
   geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
   scale_color_manual(values = colour_vector) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/D2_tsne.pdf", tsne.D2, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/D2_tsne.pdf", tsne.D2, width = 6, height = 5)
 ```
 
 ## Marker genes expression
@@ -275,7 +273,7 @@ DE.genes <- multi.DE(sce = cur_sce,
                      FDR = 0.1)
 
 # Save as table
-write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S5.xlsx")
+write.xlsx(DE.genes, file = "../../../../Dropbox (Personal)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S5.xlsx")
 ```
 
 ## Marker gene expression
@@ -303,7 +301,7 @@ ordering <- c(which(cur_sce$cell_type == "Undifferentiated"),
                which(cur_sce$cell_type == "Goblet"),
                which(cur_sce$cell_type == "Paneth"))
 
-pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/D2_heatmap.pdf", height = 7, width = 7)
+pdf(file = "../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S5/D2_heatmap.pdf", height = 7, width = 7)
 pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100), 
          labels_row = genes, show_colnames = FALSE,
          annotation_col = data.frame(row.names = colnames(for.heatmap)[ordering],
@@ -311,6 +309,10 @@ pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100),
          annotation_colors = list(cell_type = colour_vector),
          cluster_cols = FALSE)
 dev.off()
+```
+
+```{r}
+sessionInfo()
 ```
 
 
