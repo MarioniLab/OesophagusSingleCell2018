@@ -6,8 +6,6 @@ output:
   html_document:
     toc: true
     toc_depth: 2
-knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S2.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -24,7 +22,6 @@ Finally, we will mark the high-quality batches and cells.
 library(scran)
 library(scater)
 library(DropletUtils)
-library(batchelor)
 library(openxlsx)
 library(Rtsne)
 source("../../Analysis/Functions/auxiliary.R")
@@ -36,7 +33,7 @@ We will first visualize the uncorrected data.
 
 ```{r}
 # Read in all datafiles
-sce.list <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_sce.rds")
+sce.list <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_sce.rds")
 
 # Here we exclude the samples that were just used as test runs
 sce.list <- sce.list[!(names(sce.list) %in% c("Patient6_SIGAH9_DT1", "Patient6_SIGAG9_GD3",
@@ -89,7 +86,7 @@ tsne.uncorrected <- ggplot(data.frame(tsne1 = tsne$Y[,1],
   scale_colour_manual(values = annot.col) + 
   theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S4/All_data_uncorrected.pdf", tsne.uncorrected, width = 12, height = 7)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S4/All_data_uncorrected.pdf", tsne.uncorrected, width = 12, height = 7)
 ```
 
 # Batch correction across tissues
@@ -122,7 +119,7 @@ tsne.corrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2],
                         Sample = annot)) + 
   geom_point(aes(tsne1, tsne2, colour = Sample)) + scale_colour_manual(values = annot.col) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S4/All_data_corrected.pdf", tsne.corrected, width = 12, height = 7)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S4/All_data_corrected.pdf", tsne.corrected, width = 12, height = 7)
 ```
 
 # High quality samples
@@ -132,7 +129,7 @@ The exclusion criteria is explained in Suppementary Note 1.
 
 ```{r}
 # Read in the data of high quality samples
-sce.high.quality <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/High_quality_sce.rds")
+sce.high.quality <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/High_quality_sce.rds")
 annot.high.quality <- sapply(names(sce.high.quality), function(n){paste(unlist(strsplit(n, "_"))[c(3,1)], collapse = "_")})
 
 # Grey out the cells that we are not using
@@ -153,7 +150,7 @@ tsne.corrected.high.quality <- ggplot() +
   scale_colour_manual(values = annot.col.high.quality) + 
   theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S4/All_data_corrected_highQuality.pdf", tsne.corrected.high.quality, width = 12, height = 7)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S4/All_data_corrected_highQuality.pdf", tsne.corrected.high.quality, width = 12, height = 7)
 ```
 
 # View clusters that were removed due to possible contaminations
@@ -162,7 +159,7 @@ In the final step, we remove groups of cells that present contaminations when sa
 For example these are squamous oesophagus cells found in the gastric sample.
 
 ```{r}
-sce.final <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+sce.final <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
 
 # Create new colour vector
 annot <- paste(sce.all$Tissue, sce.all$Patient, sep = "_")
@@ -185,5 +182,5 @@ tsne.corrected.final <- ggplot() +
   scale_colour_manual(values = annot.col.high.quality) + 
   theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S4/All_data_corrected_final.pdf", tsne.corrected.final, width = 12, height = 7)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S4/All_data_corrected_final.pdf", tsne.corrected.final, width = 12, height = 7)
 ```

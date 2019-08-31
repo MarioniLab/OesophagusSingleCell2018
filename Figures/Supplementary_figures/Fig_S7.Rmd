@@ -1,13 +1,11 @@
 ---
-title: "Figure S5: Characterization of BE cells"
+title: "Figure S7: Characterization of BE cells"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
   html_document:
     toc: true
     toc_depth: 2
-knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S5.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -28,7 +26,7 @@ library(pheatmap)
 library(viridis)
 source("../../Analysis/Functions/auxiliary.R")
 
-sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+sce <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
 
 # Remove contaminating cell-types
 sce <- sce[,sce$include]
@@ -69,7 +67,7 @@ tsne.BE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
   geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
   scale_color_manual(values = colour_vector) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/BE_tsne.pdf", tsne.BE, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S7/BE_tsne.pdf", tsne.BE, width = 6, height = 5)
 ```
 
 ```{r}
@@ -84,7 +82,7 @@ DE.genes <- multi.DE(sce = cur_sce,
                      FDR = 0.1)
 
 # Save as table
-write.xlsx(DE.genes, file = "../../../../Dropbox (Cambridge University)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S6.xlsx")
+write.xlsx(DE.genes, file = "../../../../Dropbox (Personal)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S6.xlsx")
 ```
 
 ## Marker gene expression
@@ -113,7 +111,8 @@ ordering <- c(which(cur_sce$cell_type == "Undifferentiated"),
                which(cur_sce$cell_type == "Endocrine"),
                which(cur_sce$cell_type == "Goblet"))
 
-pdf(file = "../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S5/BE_heatmap.pdf", height = 7, width = 7)
+dev.off()
+pdf(file = "../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S7/BE_heatmap.pdf", height = 7, width = 7)
 pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100), 
          labels_row = genes, show_colnames = FALSE,
          annotation_col = data.frame(row.names = colnames(for.heatmap)[ordering],

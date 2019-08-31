@@ -73,7 +73,7 @@ p.all.cells.tissue_type <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,
         panel.grid.minor = element_blank(),
         panel.background = element_blank(), 
         axis.line = element_line(colour = "grey"))
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/All_cells.pdf", p.all.cells.tissue_type, width = 7, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/Tissue_type.pdf", p.all.cells.tissue_type, width = 7, height = 5)
 
 # Cell type
 colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
@@ -103,7 +103,7 @@ p.all.cells.cell_type <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1]
         panel.grid.minor = element_blank(),
         panel.background = element_blank(), 
         axis.line = element_line(colour = "grey"))
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/All_cells.pdf", p.all.cells.cell_type, width = 7, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/Cell_type.pdf", p.all.cells.cell_type, width = 7, height = 5)
 
 # Visualize patient
 # Colouring for patient
@@ -121,7 +121,7 @@ p.all.cells.patient <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
         panel.grid.minor = element_blank(),
         panel.background = element_blank(), 
         axis.line = element_line(colour = "grey"))
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/All_cells.pdf", p.all.cells.patient, width = 7, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/Patient.pdf", p.all.cells.patient, width = 7, height = 5)
 ```
 
 # Differential expression analysis
@@ -133,13 +133,10 @@ We then use edgeR on these pseudo-bulk samples to test for changes in mean expre
 ```{r}
 # Define conditions to test
 # First two slots are tissues and last slot is cell-types to compare
-cond <- list(c("NE", "GOJ", "Basal-Intermediate-Suprabasal"),
+cond <- list(c("NE", "GOJ", "Basal-Intermediate-Suprabasal-Dividing"),
              c("GC", "GOJ", "Foveolar_Intermediate-Foveolar_differentiated-Endocrine-Undifferentiated-Chief"),
              c("BE", "SCJ", "Foveolar_differentiated-Foveolar_Intermediate-Undifferentiated-Dividing"),
-             c("NE", "SCJ", "Basal-Intermediate-Suprabasal"))
-
-# Initialize list to store results
-out <- list()
+             c("NE", "SCJ", "Basal-Intermediate-Suprabasal-Dividing"))
 
 for(i in 1:length(cond)){
   tissue1 <- cond[[i]][1]
@@ -163,9 +160,14 @@ for(i in 1:length(cond)){
   
   # Calculate the percentage of DE genes
   print(nrow(do.call("rbind", cur_out))/nrow(sce_to_test))
-  
-  # Save in output list
-  out[[paste(tissue1, "vs", tissue2, sep = "_")]] <- cur_out
 }
 
+# NE vs GOJ: 0%
+# GC vs GOJ: 0.2%
+# BE vs SCJ: 1.5%
+# NE vs SCJ: 0.2%
+```
+
+```{r}
+sessionInfo()
 ```
