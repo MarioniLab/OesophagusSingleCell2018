@@ -315,8 +315,14 @@ Here, we want to check whether gland cells can be detected by simply sampling th
 We remove one patient due to differences in the dissociation protocol.
 
 ```{r}
+library(Seurat)
 # Read in the HCA data
-HCA.sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Teichman_data/Data/Teichmann_data_small.rds")
+HCA.sce <- Seurat::ReadH5AD("../../../../Dropbox (Personal)/Oesophagus_single_cell/Teichman_data/Data/oesophagus.full.h5ad")
+
+HCA.sce <- Seurat::ReadH5AD("../../../../Downloads/oesophagus.cellxgene.h5ad")
+
+# To check that everything was correctly read in, we comapre the metadata to a .csv file
+meta <- read.csv("../../../../Dropbox (Personal)/Oesophagus_single_cell/Teichman_data/Data/oesophagus_meta.csv")
 
 # Remove donor 296C
 HCA.sce <- HCA.sce[,HCA.sce$Donor != "296C"]
@@ -329,7 +335,6 @@ HCA.sce <- normalize(HCA.sce, return_log = TRUE)
 
 # For our data, we select the normal oesophagus an gland cells
 sce <- sce[,sce$Tissue == "NE" | sce$Tissue == "SMG"]
-sce <- normalize(sce)
 
 # Select the same set of genes for both datasets
 genes <- intersect(rownames(HCA.sce), rowData(sce)$Symbol)
