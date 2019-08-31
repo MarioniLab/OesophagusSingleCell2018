@@ -1,13 +1,11 @@
 ---
-title: "Figure S7: Entropy measures in duodenum and normal oesophagus"
+title: "Figure S11: Entropy measures in all tissues"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
   html_document:
     toc: true
     toc_depth: 2
-knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, 
-        encoding = encoding, output_file = '../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Fig_S7.html') })
 ---
 
 ```{r setup, include=FALSE}
@@ -22,7 +20,7 @@ Here, we compute the entropy per cell for duodenum and normal oesophagus cells a
 library(Rtsne)
 library(viridis)
 source("../../Analysis/Functions/auxiliary.R")
-sce <- readRDS("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+sce <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
 sce <- sce[,sce$include]
 ```
 
@@ -36,18 +34,23 @@ cur_sce <- sce[,sce$Tissue == "D2"]
 
 # Only genes that are expressed
 cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
-cur_sce <- normalize(cur_sce)
 
-# Bring normalized counts on the real scale
-cur_counts <- 2^(logcounts(cur_sce)) - 1
+# Normalization across all cells
+cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
+cur_sce <- normalize(cur_sce, return_log = FALSE)
+
+cur_counts <- as.matrix(normcounts(cur_sce))
 
 # Calculate entropy
-probs   <- t(t(cur_counts)/apply(cur_counts,2,sum))
+probs   <- t(t(cur_counts)/colSums(cur_counts))
 logprobs <- log(probs)
 logprobs[logprobs == -Inf] <- 0
-entropy <- -apply(probs*logprobs/log(nrow(cur_sce)),2,sum)
+logprobs.1 <- probs*logprobs
+entropy <- -colSums(probs*logprobs)
 
-# Visualize in form of heatmap
+# Entropy is normalized based on the number of genes
+entropy <- entropy/log(nrow(cur_counts))
+
 sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
 cur_sce <- do.call("cbind", sce.list)
 corrected <- batch.correction(sce.list)
@@ -81,24 +84,8 @@ tsne.D2.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
   geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
   scale_color_gradientn(colours = magma(100)) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S7/D2_tsne.pdf", tsne.D2, width = 6, height = 5)
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S7/D2_tsne_entropy.pdf", tsne.D2.entropy, width = 6, height = 5)
-
-# Correlate genes to entropy
-null.dist <- correlateNull(ncells = ncol(cur_sce), iters = 100000)
-cur_mat <- rbind(logcounts(cur_sce), entropy)
-cors <- correlatePairs(cur_mat, null.dist=null.dist, 
-                       pairings = list(c("entropy"), rownames(logcounts(cur_sce))))
-cors$genename <- rowData(cur_sce)$Symbol[match(cors$gene2, rowData(cur_sce)$ID)]
-cors <- cors[order(cors$rho, decreasing = TRUE),]
-
-# Gene expression
-ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "EEF1A1",])) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
-  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
-  scale_color_viridis() + theme_minimal()
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/D2_tsne.pdf", tsne.D2, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/D2_tsne_entropy.pdf", tsne.D2.entropy, width = 6, height = 5)
 ```
 
 # Entropy in NE samples
@@ -111,18 +98,23 @@ cur_sce <- sce[,sce$Tissue == "NE"]
 
 # Only genes that are expressed
 cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
-cur_sce <- normalize(cur_sce)
 
-# Bring normalized counts on the real scale
-cur_counts <- 2^(logcounts(cur_sce)) - 1
+# Normalization across all cells
+cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
+cur_sce <- normalize(cur_sce, return_log = FALSE)
+
+cur_counts <- as.matrix(normcounts(cur_sce))
 
 # Calculate entropy
-probs   <- t(t(cur_counts)/apply(cur_counts,2,sum))
+probs   <- t(t(cur_counts)/colSums(cur_counts))
 logprobs <- log(probs)
 logprobs[logprobs == -Inf] <- 0
-entropy <- -apply(probs*logprobs/log(nrow(cur_sce)),2,sum)
+logprobs.1 <- probs*logprobs
+entropy <- -colSums(probs*logprobs)
 
-# Visualize in form of heatmap
+# Entropy is normalized based on the number of genes
+entropy <- entropy/log(nrow(cur_counts))
+
 sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
 cur_sce <- do.call("cbind", sce.list)
 corrected <- batch.correction(sce.list)
@@ -155,23 +147,13 @@ tsne.NE.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
   geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
   scale_color_gradientn(colours = magma(100)) + theme_minimal()
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S7/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S7/NE_tsne_entropy.pdf", tsne.NE.entropy, width = 6, height = 5)
-
-# Correlate genes to entropy
-null.dist <- correlateNull(ncells = ncol(cur_sce), iters = 100000)
-cur_mat <- rbind(logcounts(cur_sce), entropy)
-cors <- correlatePairs(cur_mat, null.dist=null.dist, 
-                       pairings = list(c("entropy"), rownames(logcounts(cur_sce))))
-cors$genename <- rowData(cur_sce)$Symbol[match(cors$gene2, rowData(cur_sce)$ID)]
-cors <- cors[order(cors$rho, decreasing = TRUE),]
-
-# Gene expression
-ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  gene = logcounts(cur_sce)[rowData(cur_sce)$Symbol == "EEF1A1",])) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
-  geom_point(aes(tSNE1, tSNE2, colour = gene)) +
-  scale_color_viridis() + theme_minimal()
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/NE_tsne_entropy.pdf", tsne.NE.entropy, width = 6, height = 5)
 ```
+
+# Entropy in BE samples
+
+# Entropy in GC samples
+
+# Entropy in SMG samples
 
