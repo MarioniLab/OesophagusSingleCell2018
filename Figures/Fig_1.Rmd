@@ -99,6 +99,18 @@ DE.genes <- multi.DE(sce = cur_sce,
 # Alternative DE
 markers <- marker.detection(cur_sce, clusters = cur_sce$cell_type)
 
+# Calculate Jaccard Index
+match(DE.genes$Fibroblast$Symbol, markers$Fibroblast$GeneName)
+match(DE.genes$Duct_intercalating$Symbol, markers$Duct_intercalating$GeneName)
+match(DE.genes$Mucous$Symbol, markers$Mucous$GeneName)
+match(DE.genes$Doublets.unknown$Symbol, markers$Doublets.unknown$GeneName)
+match(DE.genes$Endothelial$Symbol, markers$Endothelial$GeneName)
+match(DE.genes$Nonepithelial$Symbol, markers$Nonepithelial$GeneName)
+match(DE.genes$Squamous_Esophagus$Symbol, markers$Squamous_Esophagus$GeneName)
+match(DE.genes$Serous$Symbol, markers$Serous$GeneName)
+match(DE.genes$Myo_epithelial$Symbol, markers$`Myo-epithelial`$GeneName)
+match(DE.genes$Dendritic$Symbol, markers$Dendritic$GeneName)
+
 # Visualize gene expression for control
 ggplot(data.frame(tsne1 = smg_tsne$Y[,1],
                   tsne2 = smg_tsne$Y[,2],
