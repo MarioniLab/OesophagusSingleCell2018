@@ -62,7 +62,7 @@ UMAP_BE_GC.tissue <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
                   UMAP2 = UMAP$layout[,2],
                   tissue = cur_sce$Tissue)) +
   geom_point(aes(UMAP1, UMAP2, colour = tissue)) +
-  scale_colour_manual(values = metadata(cur_sce)$colour_vector)
+  scale_colour_manual(values = metadata(cur_sce)$colour_vector) + theme_minimal()
 
 set.seed(1234)
 tsne <- Rtsne(t(corrected), pca = FALSE)
@@ -86,20 +86,20 @@ UMAP_BE_GC.cell_type <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
                   tissue = cur_sce$cell_type)) +
   geom_point(aes(UMAP1, UMAP2), colour = "black", size = 2) +
   geom_point(aes(UMAP1, UMAP2, colour = tissue)) +
-  scale_colour_manual(values = colour_vector)
+  scale_colour_manual(values = colour_vector) + theme_minimal()
 
 UMAP_BE_GC.patient <- ggplot(data.frame(UMAP1 = UMAP$layout[,1],
                   UMAP2 = UMAP$layout[,2],
                   tissue = cur_sce$Patient)) +
   geom_point(aes(UMAP1, UMAP2), colour = "black", size = 2) +
-  geom_point(aes(UMAP1, UMAP2, colour = tissue)) 
+  geom_point(aes(UMAP1, UMAP2, colour = tissue)) + theme_minimal()
 
 tsne_BE_GC.cell_type <- ggplot(data.frame(tsne1 = tsne$Y[,1],
                   tsne2 = tsne$Y[,2],
                   tissue = cur_sce$cell_type)) +
   geom_point(aes(tsne1, tsne2), colour = "black", size = 2) +
   geom_point(aes(tsne1, tsne2, colour = tissue)) +
-  scale_colour_manual(values = colour_vector)
+  scale_colour_manual(values = colour_vector) + theme_minimal()
 
 # Save figures
 ggsave("../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_3/BE_GC_tissue.pdf", UMAP_BE_GC.tissue, width = 7, height = 5)
@@ -368,7 +368,9 @@ Here, we compute the pseudotime for BE and GC to highlight the opposint HNF4 and
 # Select GC
 cur_GC <- cur_sce[,cur_sce$Tissue == "GC"]
 cur_GC <- cur_GC[Matrix::rowMeans(counts(cur_GC)) > 0,]
-cur_GC <- normalize(cur_GC)
+
+# Don't rescale to keep BE and GC comparable
+#cur_GC <- normalize(cur_GC)
 
 # Pseudotime 
 pca_GC <- t(corrected[,cur_sce$Tissue == "GC"])
@@ -419,7 +421,9 @@ ggsave(filename = "../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Fi
 # Select BE
 cur_BE <- cur_sce[,cur_sce$Tissue == "BE"]
 cur_BE <- cur_BE[Matrix::rowMeans(counts(cur_BE)) > 0,]
-cur_BE <- normalize(cur_BE)
+
+# Don't rescale to keep BE and GC comparable
+#cur_BE <- normalize(cur_BE)
 
 # Pseudotime 
 pca_BE <- t(corrected[,cur_sce$Tissue == "BE"])
