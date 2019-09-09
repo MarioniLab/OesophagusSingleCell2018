@@ -30,6 +30,61 @@ source("../../Analysis/Functions/auxiliary.R")
 
 Here, I will use different sets of genes to show that the batch correction is independent from the chosen gene set.
 
+First, I will use all expressed shared genes.
+
+```{r}
+# Load data
+all_sce <- readRDS("../../../../Dropbox (Personal)//Oesophagus_single_cell/All_corrected_sce.rds")
+all_sce <- all_sce[,all_sce$include]
+sce.list <- split.sce(sce = all_sce, groups = unique(all_sce$Sample), colData.name = "Sample")
+
+# Find shared expressed genes
+genes <- rownames(sce.list[[1]])[Matrix::rowMeans(counts(sce.list[[1]])) > 0.1]
+
+for(i in 2:length(sce.list)){
+  genes <- intersect(genes, rownames(sce.list[[i]])[Matrix::rowMeans(counts(sce.list[[i]])) > 0.1])
+}
+
+# Batch correction
+func <- paste0("scran::fastMNN(", 
+                     paste0("as.matrix(logcounts(sce.list[[", 1:length(sce.list), "]])[genes,])", collapse=", "), 
+                     ")")
+corrected <- eval( parse(text=func) )
+
+set.seed(1234)
+tsne <- Rtsne(corrected$corrected, pca = FALSE)
+
+p.tsne.allGenes <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  clusters = as.factor(colData(all_sce)$Tissue))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
+  scale_colour_manual(values = metadata(all_sce)$colour_vector)
+
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/BatchCorrectionValidation/tsne_allGenes.pdf", 
+       p.tsne.allGenes, width = 12, height = 7)
+
+clusters <- paste(colData(all_sce)$Tissue, colData(all_sce)$Tissue_cluster, sep = "_")
+mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = ncol(corrected$corrected))
+colnames(mat) <- unique(clusters)
+
+for(i in unique(clusters)){
+  mat[,i] <- rowMeans(t(corrected$corrected)[,clusters == i])
+}
+
+# Rename the matrix to contain the actual cell-type labels
+for(i in 1:ncol(mat)){
+  colnames(mat)[i] <- unique(all_sce$cell_type[all_sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
+                                 all_sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
+}
+
+# Calculate euclidean distance on corrected counts
+dend <- hclust(dist(t(mat), method = "euclidean"), method = "ward.D2")
+pdf("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/BatchCorrectionValidation/Tree_allGenes.pdf", width = 10, height = 10)
+plot(as.phylo(dend), type = "fan", 
+     tip.color = metadata(all_sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+dev.off()
+```
+
 ```{r batch-correction}
 all_sce <- readRDS("../../../../Dropbox (Personal)//Oesophagus_single_cell/All_corrected_sce.rds")
 all_sce <- all_sce[,all_sce$include]
