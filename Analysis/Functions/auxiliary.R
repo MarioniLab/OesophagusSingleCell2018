@@ -37,12 +37,14 @@ HVG <- function(sce, numberGenes = 1000){
   }
   # Multiple single cell experiment objects
   else if(typeof(sce) == "list") {
-    lapply(sce, function(n){
+    HVG.genes <- lapply(sce, function(n){
       HVG <- trendVar(n, use.spikes = FALSE)
-      HVG.1 <- decomposeVar(n, HVG)
-      HVG.1 <- HVG.1[order(HVG.1$bio, decreasing = TRUE),]
-      rownames(HVG.1)[1:numberGenes]
+      decomposeVar(n, HVG)
     })
+    
+    HVG.df <- do.call("combineVar", HVG.genes)
+    HVG.df <- HVG.df[order(HVG.df$bio, decreasing = TRUE),]
+    rownames(HVG.df)[1:numberGenes]
   }
   else{
     print("First argument must either be a single cell experiment object \n

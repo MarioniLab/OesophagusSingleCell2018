@@ -85,6 +85,66 @@ plot(as.phylo(dend), type = "fan",
 dev.off()
 ```
 
+Now I will calculate the HVG per tissue.
+
+```{r}
+# Load data
+all_sce <- readRDS("../../../../Dropbox (Personal)//Oesophagus_single_cell/All_corrected_sce.rds")
+all_sce <- all_sce[,all_sce$include]
+sce.list <- split.sce(sce = all_sce, groups = unique(all_sce$Sample), colData.name = "Sample")
+
+# Gene selection
+HVG.NE <- HVG(sce.list[grepl("NE", names(sce.list))])
+HVG.GOJ <- HVG(sce.list[grepl("GOJ", names(sce.list))])
+HVG.SCJ <- HVG(sce.list[grepl("SCJ", names(sce.list))])
+HVG.BE <- HVG(sce.list[grepl("BE", names(sce.list))])
+HVG.GC <- HVG(sce.list[grepl("GC", names(sce.list))])
+HVG.D2 <- HVG(sce.list[grepl("D2", names(sce.list))])
+HVG.SMG <- HVG(sce.list[grepl("SMG", names(sce.list))])
+
+genes <- c(HVG.NE, HVG.GOJ, HVG.SCJ, HVG.BE, HVG.GC, HVG.D2, HVG.SMG)
+genes <- unique(genes)
+
+# Batch correction
+func <- paste0("scran::fastMNN(", 
+                     paste0("as.matrix(logcounts(sce.list[[", 1:length(sce.list), "]])[genes,])", collapse=", "), 
+                     ")")
+corrected <- eval( parse(text=func) )
+
+set.seed(1234)
+tsne <- Rtsne(corrected$corrected, pca = FALSE)
+
+p.tsne.tissueHVG <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  clusters = as.factor(colData(all_sce)$Tissue))) + 
+  geom_point(aes(tSNE1, tSNE2, colour = clusters)) +
+  scale_colour_manual(values = metadata(all_sce)$colour_vector)
+
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/BatchCorrectionValidation/tsne_tissueHVG.pdf", 
+       p.tsne.tissueHVG, width = 12, height = 7)
+
+clusters <- paste(colData(all_sce)$Tissue, colData(all_sce)$Tissue_cluster, sep = "_")
+mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = ncol(corrected$corrected))
+colnames(mat) <- unique(clusters)
+
+for(i in unique(clusters)){
+  mat[,i] <- rowMeans(t(corrected$corrected)[,clusters == i])
+}
+
+# Rename the matrix to contain the actual cell-type labels
+for(i in 1:ncol(mat)){
+  colnames(mat)[i] <- unique(all_sce$cell_type[all_sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
+                                 all_sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
+}
+
+# Calculate euclidean distance on corrected counts
+dend <- hclust(dist(t(mat), method = "euclidean"), method = "ward.D2")
+pdf("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/BatchCorrectionValidation/Tree_tissueHVG.pdf", width = 10, height = 10)
+plot(as.phylo(dend), type = "fan", 
+     tip.color = metadata(all_sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
+dev.off()
+```
+
 ```{r batch-correction}
 all_sce <- readRDS("../../../../Dropbox (Personal)//Oesophagus_single_cell/All_corrected_sce.rds")
 all_sce <- all_sce[,all_sce$include]
