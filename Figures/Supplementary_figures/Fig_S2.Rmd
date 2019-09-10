@@ -27,6 +27,7 @@ library(openxlsx)
 library(Rtsne)
 library(pheatmap)
 library(viridis)
+library(RColorBrewer)
 source("../../Analysis/Functions/auxiliary.R")
 ```
 
@@ -317,21 +318,40 @@ We remove one patient due to differences in the dissociation protocol.
 ```{r}
 library(Seurat)
 # Read in the HCA data
-HCA.sce <- Seurat::ReadH5AD("../../../../Dropbox (Personal)/Oesophagus_single_cell/Teichman_data/Data/oesophagus.full.h5ad")
+HCA <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/Teichman_data/Data/oesophagus.rds")
 
-HCA.sce <- Seurat::ReadH5AD("../../../../Downloads/oesophagus.cellxgene.h5ad")
+# Visualize the data
+ggplot(data.frame(umap1 = Embeddings(HCA, reduction = "umap")[,1],
+                  umap2 = Embeddings(HCA, reduction = "umap")[,2],
+                  cell_type = HCA$Celltypes)) + 
+  geom_point(aes(umap1, umap2, colour = cell_type)) +
+  scale_colour_manual(values = c(brewer.pal(12, "Set3"), brewer.pal(8, "Set1")))
 
-# To check that everything was correctly read in, we comapre the metadata to a .csv file
-meta <- read.csv("../../../../Dropbox (Personal)/Oesophagus_single_cell/Teichman_data/Data/oesophagus_meta.csv")
+# Create SingelCellExperiment
+HCA.sce <- SingleCellExperiment(assays = list(counts = GetAssayData(HCA, 
+                                                          assay = "RNA", slot = "data")),
+                                colData = HCA@meta.data)
 
-# Remove donor 296C
-HCA.sce <- HCA.sce[,HCA.sce$Donor != "296C"]
-
-# Normalization
-cluster <- quickCluster(HCA.sce, method = "igraph", irlba.args = c("work" = 100), 
-                         max.size = 2000, min.size = 50)
-HCA.sce <- computeSumFactors(HCA.sce, clusters=cluster)
+# Normalization based on known cell types
+HCA.sce <- computeSumFactors(HCA.sce, clusters=HCA.sce$Celltypes)
 HCA.sce <- normalize(HCA.sce, return_log = TRUE)
+
+# Marker genes
+ggplot(data.frame(umap1 = Embeddings(HCA, reduction = "umap")[,1],
+                  umap2 = Embeddings(HCA, reduction = "umap")[,2],
+                  gene = logcounts(HCA.sce)["KRT4",])) + 
+  geom_point(aes(umap1, umap2, colour = gene)) +
+  scale_colour_viridis()
+
+ggplot(data.frame(umap1 = Embeddings(HCA, reduction = "umap")[,1],
+                  umap2 = Embeddings(HCA, reduction = "umap")[,2],
+                  gene = logcounts(HCA.sce)["KRT5",])) + 
+  geom_point(aes(umap1, umap2, colour = gene)) +
+  scale_colour_viridis()
+
+
+# Read in our data
+sce <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
 
 # For our data, we select the normal oesophagus an gland cells
 sce <- sce[,sce$Tissue == "NE" | sce$Tissue == "SMG"]
@@ -343,18 +363,19 @@ sce <- sce[match(genes, rowData(sce)$Symbol),]
 rownames(sce) <- genes
 
 # Split the data into individual batches
-sce.list <- split.sce(sce, groups = unique(sce$Sample), colData.name = "Sample")
+sce.list.ours <- split.sce(sce, groups = unique(sce$Sample), colData.name = "Sample")
+sce.list.HCA <- split.sce(HCA.sce, unique(HCA.sce$donor_time), colData.name = "donor_time")
 
-# Add the Teichmann data to this list
-sce.list <- c(sce.list, split.sce(HCA.sce, unique(HCA.sce$Donor), colData.name = "Donor"))
+# We will use the teichman data here
+sce.list <- c(sce.list.HCA, sce.list.ours)
 
 # Batch correction and merging
 corrected <- batch.correction(sce.list)
-sce <- do.call("cbind", split.sce(sce, groups = unique(sce$Sample), colData.name = "Sample"))
-HCA.sce <- do.call("cbind", split.sce(HCA.sce, groups = unique(HCA.sce$Donor), colData.name = "Donor"))
+sce <- do.call("cbind", sce.list.ours)
+HCA.sce <- do.call("cbind", sce.list.HCA)
 
 # Generate tissue vector - we colour the gland cells based on their cell type
-tissues.all <- c(sce$Tissue, rep("NE", ncol(HCA.sce)))
+tissues.all <- c(rep("NE", ncol(HCA.sce)), sce$Tissue)
 tissues.all[tissues.all == "SMG"] <- sce$cell_type[sce$Tissue == "SMG"]
 
 # Generate new colour vector
@@ -363,6 +384,7 @@ names(colour_vector) <- unique(tissues.all)
 colour_vector["Fibroblast"] <- "grey40"
 colour_vector["Mucous"] <- "saddlebrown"
 colour_vector["Serous"] <- "burlywood3"
+colour_vector["Doublets.unknown"] <- "white"
 colour_vector["Endothelial"] <- "grey60"
 colour_vector["Nonepithelial"] <- "grey80"
 colour_vector["Duct_intercalating"] <- "burlywood4"
@@ -371,28 +393,100 @@ colour_vector["Myo-epithelial"] <- "brown"
 colour_vector["Dendritic"] <- "grey20"
 colour_vector["NE"] <- "dark red"
 
+# Now the cell types
+types.all <- c(as.character(HCA.sce$Celltypes), sce$cell_type)
+
+colour_vector.type <- vector(length = length(unique(types.all)))
+names(colour_vector.type) <- unique(types.all)
+colour_vector.type["Fibroblast"] <- "grey40"
+colour_vector.type["Mucous"] <- "saddlebrown"
+colour_vector.type["Serous"] <- "burlywood3"
+colour_vector.type["Doublets.unknown"] <- "white"
+colour_vector.type["Endothelial"] <- "grey60"
+colour_vector.type["Nonepithelial"] <- "grey80"
+colour_vector.type["Duct_intercalating"] <- "burlywood4"
+colour_vector.type["Squamous_Esophagus"] <- "black"
+colour_vector.type["Myo-epithelial"] <- "brown"
+colour_vector.type["Dendritic"] <- "grey20"
+colour_vector.type["Unknown"] <- "grey"
+colour_vector.type["Suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[10]
+colour_vector.type["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
+colour_vector.type["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
+colour_vector.type["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[2]
+colour_vector.type["Epi_suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[10]
+colour_vector.type["Epi_upper"] <- colorRampPalette(c("white", "dark red"))(10)[4]
+colour_vector.type["Epi_stratified"] <- colorRampPalette(c("white", "dark red"))(10)[7]
+colour_vector.type["Epi_dividing"] <- colorRampPalette(c("white", "dark red"))(10)[2]
+colour_vector.type["Epi_basal"] <- "red"
+colour_vector.type["T_CD4"] <- "darkgoldenrod1"
+colour_vector.type["Dendritic_Cells"] <-"grey20"
+colour_vector.type["T_CD8"] <-"darkgoldenrod1"
+colour_vector.type["Mono_macro"] <-"darkgoldenrod1"
+colour_vector.type["NK_T_CD8_Cytotoxic"] <-"darkgoldenrod1"
+colour_vector.type["B_CD27pos"] <-"darkgoldenrod1"
+colour_vector.type["B_CD27neg"] <-"darkgoldenrod1"
+colour_vector.type["Mast_cell"] <- "darkgoldenrod1"
+colour_vector.type["Stroma"] <- "purple"
+colour_vector.type["Lymph_vessel"] <- "dark green"
+colour_vector.type["Blood_vessel"] <- "dark blue"
+colour_vector.type["Glands_duct"] <- "burlywood4"
+colour_vector.type["Glands_mucous"] <- "saddlebrown"
+
 # Visualization of mapped data
 set.seed(12345)
 tsne <- Rtsne(t(corrected), perplexity = 100, pca = FALSE)
 
 # Visualization
-HCA.all.cells <- ggplot() +
+HCA.all.cell_type <- ggplot() +
+  # HCA cells
     geom_point(data = data.frame(
-    tsne1 = tsne$Y[1:(ncol(corrected)-ncol(HCA.sce)),1],
-    tsne2 = tsne$Y[1:(ncol(corrected)-ncol(HCA.sce)),2],
-    tissue = tissues.all[1:(ncol(corrected)-ncol(HCA.sce))]
+    tsne1 = tsne$Y[1:ncol(HCA.sce),1],
+    tsne2 = tsne$Y[1:ncol(HCA.sce),2],
+    cell_type = types.all[1:ncol(HCA.sce)]
     ), 
-    aes(tsne1, tsne2, colour = tissue), size = 1) +
+    aes(tsne1, tsne2, colour = cell_type), size = 1) +
+  # Our cells on top
+  # Black background
     geom_point(data = data.frame(
-    tsne1 = tsne$Y[(ncol(corrected)-ncol(HCA.sce)+1):ncol(corrected),1],
-    tsne2 = tsne$Y[(ncol(corrected)-ncol(HCA.sce)+1):ncol(corrected),2],
-    tissue = tissues.all[(ncol(corrected)-ncol(HCA.sce)+1):ncol(corrected)]
+    tsne1 = tsne$Y[(ncol(HCA.sce)+1):ncol(corrected),1],
+    tsne2 = tsne$Y[(ncol(HCA.sce)+1):ncol(corrected),2],
+    cell_type = types.all[(ncol(HCA.sce)+1):ncol(corrected)]
     ), 
     aes(tsne1, tsne2), size = 2, colour = "black") +
+    # coloured dots
   geom_point(data = data.frame(
-    tsne1 = tsne$Y[(ncol(corrected)-ncol(HCA.sce)+1):ncol(corrected),1],
-    tsne2 = tsne$Y[(ncol(corrected)-ncol(HCA.sce)+1):ncol(corrected),2],
-    tissue = tissues.all[(ncol(corrected)-ncol(HCA.sce)+1):ncol(corrected)]
+    tsne1 = tsne$Y[(ncol(HCA.sce)+1):ncol(corrected),1],
+    tsne2 = tsne$Y[(ncol(HCA.sce)+1):ncol(corrected),2],
+    cell_type = types.all[(ncol(HCA.sce)+1):ncol(corrected)]
+    ), 
+    aes(tsne1, tsne2, colour = cell_type), size = 1) + 
+  scale_color_manual(values = colour_vector.type) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "grey"))
+
+HCA.all.tissue <- ggplot() +
+  # HCA cells
+    geom_point(data = data.frame(
+    tsne1 = tsne$Y[1:ncol(HCA.sce),1],
+    tsne2 = tsne$Y[1:ncol(HCA.sce),2],
+    tissue = tissues.all[1:ncol(HCA.sce)]
+    ), 
+    aes(tsne1, tsne2, colour = tissue), size = 1) +
+  # Our cells on top
+  # Black background
+    geom_point(data = data.frame(
+    tsne1 = tsne$Y[(ncol(HCA.sce)+1):ncol(corrected),1],
+    tsne2 = tsne$Y[(ncol(HCA.sce)+1):ncol(corrected),2],
+    tissue = tissues.all[(ncol(HCA.sce)+1):ncol(corrected)]
+    ), 
+    aes(tsne1, tsne2), size = 2, colour = "black") +
+    # coloured dots
+  geom_point(data = data.frame(
+    tsne1 = tsne$Y[(ncol(HCA.sce)+1):ncol(corrected),1],
+    tsne2 = tsne$Y[(ncol(HCA.sce)+1):ncol(corrected),2],
+    tissue = tissues.all[(ncol(HCA.sce)+1):ncol(corrected)]
     ), 
     aes(tsne1, tsne2, colour = tissue), size = 1) + 
   scale_color_manual(values = colour_vector) +
@@ -401,6 +495,36 @@ HCA.all.cells <- ggplot() +
         panel.background = element_blank(), 
         axis.line = element_line(colour = "grey"))
 
-ggsave("../../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/Figure_S3/HCA_data.pdf", HCA.all.cells, width = 10, height = 8)
+# Visualize marker genes
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  gene = c(logcounts(HCA.sce)["KRT5",], 
+                           logcounts(sce)[rowData(sce)$Symbol == "KRT5",]))) +
+  geom_point(aes(tsne1, tsne2, colour = gene)) +
+  scale_colour_viridis()
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  gene = c(logcounts(HCA.sce)["KRT4",], 
+                           logcounts(sce)[rowData(sce)$Symbol == "KRT4",]))) +
+  geom_point(aes(tsne1, tsne2, colour = gene)) +
+  scale_colour_viridis()
+
+# Now only the HCA cells
+HCA.only <- ggplot() +
+    geom_point(data = data.frame(
+    tsne1 = tsne$Y[1:ncol(HCA.sce),1],
+    tsne2 = tsne$Y[1:ncol(HCA.sce),2],
+    cell_type = types.all[1:ncol(HCA.sce)]
+    ), 
+    aes(tsne1, tsne2, colour = cell_type), size = 1)+ 
+  scale_color_manual(values = colour_vector.type) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "grey"))
+
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S2/HCA_all.pdf", HCA.all.cell_type, width = 10, height = 8)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S2/HCA_only.pdf", HCA.only, width = 10, height = 8)
 ```
 
