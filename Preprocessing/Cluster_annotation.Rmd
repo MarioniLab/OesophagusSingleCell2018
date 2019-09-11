@@ -24,7 +24,7 @@ library(scater)
 library(openxlsx)
 library(Rtsne)
 source("../Analysis/Functions/auxiliary.R")
-sce <- readRDS("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+sce <- readRDS("../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
 # Annotation
@@ -40,13 +40,13 @@ df.annot <- df.annot[order(df.annot[,1], as.integer(df.annot[,2])),]
 df.annot$cell_type <- vector(length = nrow(df.annot))
 df.annot$include <- vector(length = nrow(df.annot))
 
-write.xlsx(df.annot, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/Cell_type_annotation.xlsx")
+write.xlsx(df.annot, "../../../Dropbox (Personal)/Oesophagus_single_cell/Additional_files/Cell_type_annotation.xlsx")
 ```
 
 After cluster annotation, we will save this in the colData slot of the SCE object.
 
 ```{r}
-annot <- read.xlsx("../../../Dropbox (Cambridge University)/Oesophagus_single_cell/Additional_files/Cell_type_annotation_v5.xlsx")
+annot <- read.xlsx("../../../Dropbox (Personal)/Oesophagus_single_cell/Additional_files/Cell_type_annotation_v6.xlsx")
 
 # Link the tissue/cluster annotation of the single cell data to the annotation dataframe
 m <- match(paste(sce$Tissue, sce$Tissue_cluster, sep = "_"), 
@@ -87,7 +87,7 @@ ggplot(data.frame(tsne1 = reducedDims(sce)$TSNE[,1],
 
 metadata(sce)$colour_vector <- colour_vector
 
-saveRDS(sce, "../../../Dropbox (Cambridge University)/Oesophagus_single_cell/All_corrected_sce.rds")
+saveRDS(sce, "../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
 

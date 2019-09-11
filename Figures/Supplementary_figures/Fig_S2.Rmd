@@ -409,7 +409,7 @@ colour_vector.type["Squamous_Esophagus"] <- "black"
 colour_vector.type["Myo-epithelial"] <- "brown"
 colour_vector.type["Dendritic"] <- "grey20"
 colour_vector.type["Unknown"] <- "grey"
-colour_vector.type["Suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[10]
+colour_vector.type["Superficial"] <- colorRampPalette(c("white", "dark red"))(10)[10]
 colour_vector.type["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
 colour_vector.type["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
 colour_vector.type["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[2]
@@ -507,6 +507,13 @@ ggplot(data.frame(tsne1 = tsne$Y[,1],
                   tsne2 = tsne$Y[,2],
                   gene = c(logcounts(HCA.sce)["KRT4",], 
                            logcounts(sce)[rowData(sce)$Symbol == "KRT4",]))) +
+  geom_point(aes(tsne1, tsne2, colour = gene)) +
+  scale_colour_viridis()
+
+ggplot(data.frame(tsne1 = tsne$Y[,1],
+                  tsne2 = tsne$Y[,2],
+                  gene = c(logcounts(HCA.sce)["COL17A1",], 
+                           logcounts(sce)[rowData(sce)$Symbol == "COL17A1",]))) +
   geom_point(aes(tsne1, tsne2, colour = gene)) +
   scale_colour_viridis()
 

@@ -127,7 +127,7 @@ tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
 colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
 names(colour_vector) <- unique(cur_sce$cell_type)
 colour_vector["Unknown"] <- "grey"
-colour_vector["Suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[10]
+colour_vector["Superficial"] <- colorRampPalette(c("white", "dark red"))(10)[10]
 colour_vector["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
 colour_vector["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
 colour_vector["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[1]

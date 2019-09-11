@@ -79,7 +79,7 @@ ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Su
 colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
 names(colour_vector) <- unique(cur_sce$cell_type)
 colour_vector["Unknown"] <- "grey20"
-colour_vector["Suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[10]
+colour_vector["Superficial"] <- colorRampPalette(c("white", "dark red"))(10)[10]
 colour_vector["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
 colour_vector["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
 colour_vector["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[1]
@@ -133,10 +133,10 @@ We then use edgeR on these pseudo-bulk samples to test for changes in mean expre
 ```{r}
 # Define conditions to test
 # First two slots are tissues and last slot is cell-types to compare
-cond <- list(c("NE", "GOJ", "Basal-Intermediate-Suprabasal-Dividing"),
+cond <- list(c("NE", "GOJ", "Basal-Intermediate-Superficial-Dividing"),
              c("GC", "GOJ", "Foveolar_Intermediate-Foveolar_differentiated-Endocrine-Undifferentiated-Chief"),
              c("BE", "SCJ", "Foveolar_differentiated-Foveolar_Intermediate-Undifferentiated-Dividing"),
-             c("NE", "SCJ", "Basal-Intermediate-Suprabasal-Dividing"))
+             c("NE", "SCJ", "Basal-Intermediate-Superficial-Dividing"))
 
 for(i in 1:length(cond)){
   tissue1 <- cond[[i]][1]
