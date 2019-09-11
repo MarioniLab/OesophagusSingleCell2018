@@ -319,6 +319,8 @@ We remove one patient due to differences in the dissociation protocol.
 library(Seurat)
 # Read in the HCA data
 HCA <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/Teichman_data/Data/oesophagus.rds")
+HCA.meta <- read.csv("../../../../Dropbox (Personal)/Oesophagus_single_cell/Teichman_data/Data/oesophagus_meta.csv",
+                     stringsAsFactors = FALSE)
 
 # Visualize the data
 ggplot(data.frame(umap1 = Embeddings(HCA, reduction = "umap")[,1],
@@ -413,28 +415,29 @@ colour_vector.type["Superficial"] <- colorRampPalette(c("white", "dark red"))(10
 colour_vector.type["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
 colour_vector.type["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
 colour_vector.type["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[2]
-colour_vector.type["Epi_suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[10]
-colour_vector.type["Epi_upper"] <- colorRampPalette(c("white", "dark red"))(10)[4]
+colour_vector.type["Epi_suprabasal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
+colour_vector.type["Epi_upper"] <- colorRampPalette(c("white", "dark red"))(10)[10]
 colour_vector.type["Epi_stratified"] <- colorRampPalette(c("white", "dark red"))(10)[7]
 colour_vector.type["Epi_dividing"] <- colorRampPalette(c("white", "dark red"))(10)[2]
-colour_vector.type["Epi_basal"] <- "red"
-colour_vector.type["T_CD4"] <- "darkgoldenrod1"
-colour_vector.type["Dendritic_Cells"] <-"grey20"
-colour_vector.type["T_CD8"] <-"darkgoldenrod1"
-colour_vector.type["Mono_macro"] <-"darkgoldenrod1"
-colour_vector.type["NK_T_CD8_Cytotoxic"] <-"darkgoldenrod1"
-colour_vector.type["B_CD27pos"] <-"darkgoldenrod1"
-colour_vector.type["B_CD27neg"] <-"darkgoldenrod1"
-colour_vector.type["Mast_cell"] <- "darkgoldenrod1"
-colour_vector.type["Stroma"] <- "purple"
-colour_vector.type["Lymph_vessel"] <- "dark green"
-colour_vector.type["Blood_vessel"] <- "dark blue"
+colour_vector.type["Epi_basal"] <- unique(HCA.meta$cellcols[HCA.meta$cell.types.f == "Epi_basal"])
+colour_vector.type["T_CD4"] <- unique(HCA.meta$cellcols[HCA.meta$cell.types.f == "T_CD4"])
+colour_vector.type["Dendritic_Cells"] <- "grey20"
+colour_vector.type["T_CD8"] <- unique(HCA.meta$cellcols[HCA.meta$cell.types.f == "T_CD8"])
+colour_vector.type["Mono_macro"] <- unique(HCA.meta$cellcols[HCA.meta$cell.types.f == "Mono_macro"])
+colour_vector.type["NK_T_CD8_Cytotoxic"] <- unique(HCA.meta$cellcols[HCA.meta$cell.types.f == "NK_T_CD8_Cytotoxic"])
+colour_vector.type["B_CD27pos"] <- unique(HCA.meta$cellcols[HCA.meta$cell.types.f == "B_CD27pos"])
+colour_vector.type["B_CD27neg"] <- unique(HCA.meta$cellcols[HCA.meta$cell.types.f == "B_CD27neg"])
+colour_vector.type["Mast_cell"] <- unique(HCA.meta$cellcols[HCA.meta$cell.types.f == "Mast_cell"])
+colour_vector.type["Stroma"] <- unique(HCA.meta$cellcols[HCA.meta$cell.types.f == "Stroma"])
+colour_vector.type["Lymph_vessel"] <- unique(HCA.meta$cellcols[HCA.meta$cell.types.f == "Lymph_vessel"])
+colour_vector.type["Blood_vessel"] <- unique(HCA.meta$cellcols[HCA.meta$cell.types.f == "Blood_vessel"])
 colour_vector.type["Glands_duct"] <- "burlywood4"
 colour_vector.type["Glands_mucous"] <- "saddlebrown"
 
 # Visualization of mapped data
-set.seed(12345)
-tsne <- Rtsne(t(corrected), perplexity = 100, pca = FALSE)
+# 12345 is ok
+set.seed(123)
+tsne <- Rtsne(t(corrected), perplexity = 200, pca = FALSE)
 
 # Visualization
 HCA.all.cell_type <- ggplot() +
@@ -444,7 +447,7 @@ HCA.all.cell_type <- ggplot() +
     tsne2 = tsne$Y[1:ncol(HCA.sce),2],
     cell_type = types.all[1:ncol(HCA.sce)]
     ), 
-    aes(tsne1, tsne2, colour = cell_type), size = 1) +
+    aes(tsne1, tsne2, colour = cell_type), size = 0.5) +
   # Our cells on top
   # Black background
     geom_point(data = data.frame(
@@ -473,7 +476,7 @@ HCA.all.tissue <- ggplot() +
     tsne2 = tsne$Y[1:ncol(HCA.sce),2],
     tissue = tissues.all[1:ncol(HCA.sce)]
     ), 
-    aes(tsne1, tsne2, colour = tissue), size = 1) +
+    aes(tsne1, tsne2, colour = tissue), size = 0.5) +
   # Our cells on top
   # Black background
     geom_point(data = data.frame(
@@ -524,7 +527,7 @@ HCA.only <- ggplot() +
     tsne2 = tsne$Y[1:ncol(HCA.sce),2],
     cell_type = types.all[1:ncol(HCA.sce)]
     ), 
-    aes(tsne1, tsne2, colour = cell_type), size = 1)+ 
+    aes(tsne1, tsne2, colour = cell_type), size = 0.5)+ 
   scale_color_manual(values = colour_vector.type) +
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
