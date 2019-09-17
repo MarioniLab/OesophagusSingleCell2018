@@ -188,17 +188,75 @@ Diff_BE_vs_GC.out$specificity[Diff_BE_vs_GC.out$logFC > 0 & Diff_BE_vs_GC.out$FD
 
 out$Diff_BE_vs_GC <- Diff_BE_vs_GC.out
 
+# Normalize sce
+cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$Tissue, cur_sce$cell_type, sep = "_"))
+cur_sce <- normalize(cur_sce, return_log = TRUE)
 
 # Visualize genes 
+# Differentiated cells
 cur_tab <- out$Diff_BE_vs_GC
-cur_mat <- logcounts(cur_sce)[c(rownames(cur_tab)[1:20], rownames(cur_tab)[(nrow(cur_tab)-20):nrow(cur_tab)]),]
-colnames(cur_mat) <- paste(cur_sce$Barcode, cur_sce$Patient)
+cur_tab <- cur_tab[!is.na(cur_tab$specificity),]
+cur_tab <- rbind(head(cur_tab, 100), tail(cur_tab, 100))
+for_vis <- cur_sce[,cur_sce$cell_type == "Foveolar_differentiated"]
+cur_mat <- logcounts(for_vis)[rownames(cur_tab), ]
+colnames(cur_mat) <- paste(for_vis$Barcode, for_vis$Patient)
 pheatmap(cur_mat, 
          cluster_rows = FALSE, 
          annotation_col = data.frame(row.names = colnames(cur_mat),
-                                     cell_type = cur_sce$cell_type,
-                                     tissue = cur_sce$Tissue),
-         show_colnames = FALSE, gaps_row = 20)
+                                     cell_type = for_vis$cell_type,
+                                     tissue = for_vis$Tissue,
+                                     patient = for_vis$Patient),
+         show_colnames = FALSE, show_rownames = FALSE, scale = "row",
+         color = colorRampPalette(c("dark blue", "blue", "white", "red", "dark red"))(100))
+
+# Undifferentiated cells
+cur_tab <- out$Undiff_BE_vs_GC
+cur_tab <- cur_tab[!is.na(cur_tab$specificity),]
+cur_tab <- rbind(head(cur_tab, 100), tail(cur_tab, 100))
+for_vis <- cur_sce[,cur_sce$cell_type == "Undifferentiated"]
+cur_mat <- logcounts(for_vis)[rownames(cur_tab), ]
+colnames(cur_mat) <- paste(for_vis$Barcode, for_vis$Patient)
+pheatmap(cur_mat, 
+         cluster_rows = FALSE, 
+         annotation_col = data.frame(row.names = colnames(cur_mat),
+                                     cell_type = for_vis$cell_type,
+                                     tissue = for_vis$Tissue,
+                                     patient = for_vis$Patient),
+         show_colnames = FALSE, show_rownames = FALSE, scale = "row",
+         color = colorRampPalette(c("dark blue", "blue", "white", "red", "dark red"))(100))
+
+# BE
+cur_tab <- out$BE_Undiff_vs_Diff
+cur_tab <- cur_tab[!is.na(cur_tab$specificity),]
+cur_tab <- rbind(head(cur_tab, 100), tail(cur_tab, 100))
+for_vis <- cur_sce[,cur_sce$Tissue == "BE" & cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated") ]
+cur_mat <- logcounts(for_vis)[rownames(cur_tab), ]
+colnames(cur_mat) <- paste(for_vis$Barcode, for_vis$Patient)
+pheatmap(cur_mat, 
+         cluster_rows = FALSE, 
+         annotation_col = data.frame(row.names = colnames(cur_mat),
+                                     cell_type = for_vis$cell_type,
+                                     tissue = for_vis$Tissue,
+                                     patient = for_vis$Patient),
+         show_colnames = FALSE, show_rownames = FALSE, scale = "row",
+         color = colorRampPalette(c("dark blue", "blue", "white", "red", "dark red"))(100))
+
+# GC
+cur_tab <- out$GC_Undiff_vs_Diff
+cur_tab <- cur_tab[!is.na(cur_tab$specificity),]
+cur_tab <- rbind(head(cur_tab, 100), tail(cur_tab, 100))
+for_vis <- cur_sce[,cur_sce$Tissue == "GC" & cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated") ]
+cur_mat <- logcounts(for_vis)[rownames(cur_tab), ]
+colnames(cur_mat) <- paste(for_vis$Barcode, for_vis$Patient)
+pheatmap(cur_mat, 
+         cluster_rows = FALSE, 
+         annotation_col = data.frame(row.names = colnames(cur_mat),
+                                     cell_type = for_vis$cell_type,
+                                     tissue = for_vis$Tissue,
+                                     patient = for_vis$Patient),
+         show_colnames = FALSE, show_rownames = FALSE, scale = "row",
+         color = colorRampPalette(c("dark blue", "blue", "white", "red", "dark red"))(100))
+
 
 # Save results
 write.xlsx(out, file = "../../../Dropbox (Personal)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S7.xlsx")
@@ -280,15 +338,62 @@ BE_diff <- BE_diff[order(rowMeans(BE_diff[,c(2,4)]), decreasing = FALSE),]
 out_spec$BE_diff_specific <- BE_diff
 
 # Visualize results
-cur_mat <- logcounts(cur_sce)[out_spec$GC_diff_specific$ID,]
-colnames(cur_mat) <- paste(cur_sce$Barcode, cur_sce$Patient)
+# GC diff
+for_vis <- cur_sce[,cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated") ]
+cur_mat <- logcounts(for_vis)[out_spec$GC_diff_specific$ID,]
+colnames(cur_mat) <- paste(for_vis$Barcode, for_vis$Patient)
 cur_dat <- data.frame(row.names = colnames(cur_mat),
-                                     cell_type = cur_sce$cell_type,
-                                     tissue = cur_sce$Tissue)
+                                     cell_type = for_vis$cell_type,
+                                     tissue = for_vis$Tissue,
+                      patient = for_vis$Patient)
 pheatmap(cur_mat[,order(cur_dat$cell_type, cur_dat$tissue)], 
-         cluster_rows = FALSE, 
+         cluster_rows = FALSE, cluster_cols = FALSE,
          annotation_col = cur_dat[order(cur_dat$cell_type, cur_dat$tissue),],
-         show_colnames = FALSE, cluster_cols = FALSE)
+         show_colnames = FALSE, show_rownames = FALSE, 
+         color = colorRampPalette(c("dark blue", "blue", "white", "red", "dark red"))(100))
+
+# BE diff
+for_vis <- cur_sce[,cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated") ]
+cur_mat <- logcounts(for_vis)[out_spec$BE_diff_specific$ID,]
+colnames(cur_mat) <- paste(for_vis$Barcode, for_vis$Patient)
+cur_dat <- data.frame(row.names = colnames(cur_mat),
+                                     cell_type = for_vis$cell_type,
+                                     tissue = for_vis$Tissue,
+                      patient = for_vis$Patient)
+pheatmap(cur_mat[,order(cur_dat$cell_type, cur_dat$tissue)], 
+         cluster_rows = FALSE, cluster_cols = FALSE,
+         annotation_col = cur_dat[order(cur_dat$cell_type, cur_dat$tissue),],
+         show_colnames = FALSE, show_rownames = FALSE, 
+         color = colorRampPalette(c("dark blue", "blue", "white", "red", "dark red"))(100))
+
+# BE undiff
+for_vis <- cur_sce[,cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated") ]
+cur_mat <- logcounts(for_vis)[out_spec$BE_undiff_specific$ID,]
+colnames(cur_mat) <- paste(for_vis$Barcode, for_vis$Patient)
+cur_dat <- data.frame(row.names = colnames(cur_mat),
+                                     cell_type = for_vis$cell_type,
+                                     tissue = for_vis$Tissue,
+                      patient = for_vis$Patient)
+pheatmap(cur_mat[,order(cur_dat$cell_type, cur_dat$tissue)], 
+         cluster_rows = FALSE, cluster_cols = FALSE,
+         annotation_col = cur_dat[order(cur_dat$cell_type, cur_dat$tissue),],
+         show_colnames = FALSE, show_rownames = FALSE, 
+         color = colorRampPalette(c("dark blue", "blue", "white", "red", "dark red"))(100))
+
+# GC undiff
+for_vis <- cur_sce[,cur_sce$cell_type %in% c("Undifferentiated", "Foveolar_differentiated") ]
+cur_mat <- logcounts(for_vis)[out_spec$GC_undiff_specific$ID,]
+colnames(cur_mat) <- paste(for_vis$Barcode, for_vis$Patient)
+cur_dat <- data.frame(row.names = colnames(cur_mat),
+                                     cell_type = for_vis$cell_type,
+                                     tissue = for_vis$Tissue,
+                      patient = for_vis$Patient)
+pheatmap(cur_mat[,order(cur_dat$cell_type, cur_dat$tissue)], 
+         cluster_rows = FALSE, cluster_cols = FALSE,
+         annotation_col = cur_dat[order(cur_dat$cell_type, cur_dat$tissue),],
+         show_colnames = FALSE, show_rownames = FALSE, 
+         color = colorRampPalette(c("dark blue", "blue", "white", "red", "dark red"))(100))
+
 
 # Save results
 write.xlsx(out_spec, file = "../../../Dropbox (Personal)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S8.xlsx")
@@ -321,7 +426,20 @@ ggplot(data.frame(UMAP1 = UMAP$layout[,1],
 
 # Visualize gene expression in form of boxplots
 for.plot <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
-colnames(for.plot) <- paste(cur_sce$Tissue, cur_sce$cell_type, cur_sce$Barcode, sep = "_")
+rownames(for.plot) <- genes
+colnames(for.plot) <- paste(cur_sce$Tissue, cur_sce$cell_type, cur_sce$Barcode, sep = "-")
+
+library(reshape2)
+for.plot.melt <- melt(as.matrix(for.plot))
+for.plot.melt$Tissue <- sub("-.*$", "", for.plot.melt$Var2)
+for.plot.melt$Tissue <- factor(for.plot.melt$Tissue, levels = c("GC", "BE"))
+for.plot.melt$cell_type <- sapply(as.character(for.plot.melt$Var2), function(n){unlist(strsplit(n, "-"))[2]})
+for.plot.melt$cell_type <- factor(for.plot.melt$cell_type, levels = 
+           c("Undifferentiated", "Dividing", "Foveolar_Intermediate", "Foveolar_differentiated"))
+
+tissue.boxplot <- ggplot(for.plot.melt) + geom_boxplot(aes(x = Tissue, y = value, fill = cell_type)) +
+  facet_wrap(~ Var1, nrow = length(genes)) + scale_fill_manual(values = colour_vector)
+ggsave("../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Figure_3/Boxplot_marker_genes.pdf", tissue.boxplot, width = 5, height = 15)
 
 # Order cells
 ind_order <- c(which(cur_sce$Tissue == "GC" & cur_sce$cell_type == "Undifferentiated"),
