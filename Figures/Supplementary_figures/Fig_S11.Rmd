@@ -1,5 +1,5 @@
 ---
-title: "Figure S11: Entropy measures in all tissues"
+title: "Figure S11: Differential expression analysis between tissues"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -12,334 +12,162 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Here, we compute the entropy per cell for duodenum and normal oesophagus cells as a control for this measure to detect stem-cell-like phenotypes.
+This script focuses on detecting the genes that are differentially expressed between BE and SCJ, GC and GOJ, NE and SCJ and NE and GOJ
 
 # Read in the data
 
 ```{r libraries, message=FALSE}
+library(scran)
+library(scater)
+library(DropletUtils)
+library(openxlsx)
 library(Rtsne)
+library(pheatmap)
+library(RColorBrewer)
+library(edgeR)
 library(viridis)
 source("../../Analysis/Functions/auxiliary.R")
 sce <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
-sce <- sce[,sce$include]
 ```
 
-# Entropy in D2 samples
+# Visualize GC, GOJ, BE and SCJ samples
 
-Here, we compute the entropy in the duodenum samples.
-
-```{r}
-# Select D2 cells
-cur_sce <- sce[,sce$Tissue == "D2"]
-
-# Only genes that are expressed
-cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
-
-# Normalization across all cells
-cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
-cur_sce <- normalize(cur_sce, return_log = FALSE)
-
-cur_counts <- as.matrix(normcounts(cur_sce))
-
-# Calculate entropy
-probs   <- t(t(cur_counts)/colSums(cur_counts))
-logprobs <- log(probs)
-logprobs[logprobs == -Inf] <- 0
-logprobs.1 <- probs*logprobs
-entropy <- -colSums(probs*logprobs)
-
-# Entropy is normalized based on the number of genes
-entropy <- entropy/log(nrow(cur_counts))
-
-sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
-cur_sce <- do.call("cbind", sce.list)
-corrected <- batch.correction(sce.list)
-
-# Compute tSNE
-set.seed(12345)
-tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
-
-# Create colour vector
-colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
-names(colour_vector) <- unique(cur_sce$cell_type)
-colour_vector["Enterocytes_Intermediate"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[6]
-colour_vector["Enterocytes_differentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[10]
-colour_vector["Dividing"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[3]
-colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[1]
-colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
-colour_vector["Paneth"] <- colorRampPalette(c("white", "seagreen4"))(10)[6]
-
-tsne.D2 <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  cell_type = cur_sce$cell_type)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
-  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
-  scale_color_manual(values = colour_vector) + theme_minimal()
-
-# Colour by entropy
-tsne.D2.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  entropy = entropy)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
-  geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
-  scale_color_gradientn(colours = magma(100)) + theme_minimal()
-
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/D2_tsne.pdf", tsne.D2, width = 6, height = 5)
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/D2_tsne_entropy.pdf", tsne.D2.entropy, width = 6, height = 5)
-```
-
-# Entropy in NE samples
-
-Here, we compute the entropy in the normal oesophagus samples.
+Here we perform differential expression (DE) analysis between the epithelial tissues of the GC, GOJ, SCJ, BE and NE samples.
 
 ```{r}
-# Select D2 cells
-cur_sce <- sce[,sce$Tissue == "NE"]
+# Select tissues to test
+cur_sce <- sce[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ")]
 
-# Only genes that are expressed
-cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
-
-# Normalization across all cells
-cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
-cur_sce <- normalize(cur_sce, return_log = FALSE)
-
-cur_counts <- as.matrix(normcounts(cur_sce))
-
-# Calculate entropy
-probs   <- t(t(cur_counts)/colSums(cur_counts))
-logprobs <- log(probs)
-logprobs[logprobs == -Inf] <- 0
-logprobs.1 <- probs*logprobs
-entropy <- -colSums(probs*logprobs)
-
-# Entropy is normalized based on the number of genes
-entropy <- entropy/log(nrow(cur_counts))
-
+# Perform batch correction
 sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
-cur_sce <- do.call("cbind", sce.list)
 corrected <- batch.correction(sce.list)
+cur_sce <- do.call("cbind", sce.list)
 
-# Compute tSNE
-set.seed(12345)
+# Compute new tSNE
+set.seed(11111)
 tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+reducedDims(cur_sce)$TSNE <- tsne$Y
 
-# Create colour vector
+# Visualize tSNEs
+# Tissue
+p.all.cells <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
+                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
+                  tissue = colData(cur_sce)$Tissue)) + 
+  geom_point(aes(tsne1, tsne2), colour = "black", size = 1) + 
+  geom_point(aes(tsne1, tsne2, colour = tissue), size = 0.5) + 
+  scale_color_manual(values = metadata(cur_sce)$colour_vector) + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "grey"))
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/All_cells.pdf", p.all.cells, width = 7, height = 5)
+
+# Tissue typse
+p.all.cells.tissue_type <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
+                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
+                  tissue = colData(cur_sce)$tissue_type)) +
+  geom_point(aes(tsne1, tsne2), colour = "black", size = 1) + 
+  geom_point(aes(tsne1, tsne2, colour = tissue), size = 0.5) + 
+  scale_color_manual(values = c("dark blue", "dark red")) + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "grey"))
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/Tissue_type.pdf", p.all.cells.tissue_type, width = 7, height = 5)
+
+# Cell type
 colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
 names(colour_vector) <- unique(cur_sce$cell_type)
-colour_vector["Unknown"] <- "grey"
+colour_vector["Unknown"] <- "grey20"
 colour_vector["Superficial"] <- colorRampPalette(c("white", "dark red"))(10)[10]
 colour_vector["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
 colour_vector["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
 colour_vector["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[1]
-
-tsne.NE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  cell_type = cur_sce$cell_type)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
-  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
-  scale_color_manual(values = colour_vector) + theme_minimal()
-
-# Colour by entropy
-tsne.NE.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  entropy = entropy)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
-  geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
-  scale_color_gradientn(colours = magma(100)) + theme_minimal()
-
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/NE_tsne_entropy.pdf", tsne.NE.entropy, width = 6, height = 5)
-```
-
-# Entropy in BE samples
-
-```{r}
-# Select D2 cells
-cur_sce <- sce[,sce$Tissue == "BE"]
-
-# Only genes that are expressed
-cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
-
-# Normalization across all cells
-cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
-cur_sce <- normalize(cur_sce, return_log = FALSE)
-
-cur_counts <- as.matrix(normcounts(cur_sce))
-
-# Calculate entropy
-probs   <- t(t(cur_counts)/colSums(cur_counts))
-logprobs <- log(probs)
-logprobs[logprobs == -Inf] <- 0
-logprobs.1 <- probs*logprobs
-entropy <- -colSums(probs*logprobs)
-
-# Entropy is normalized based on the number of genes
-entropy <- entropy/log(nrow(cur_counts))
-
-sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
-cur_sce <- do.call("cbind", sce.list)
-corrected <- batch.correction(sce.list)
-
-# Compute tSNE
-set.seed(12345)
-tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
-
-# Create colour vector
-colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
-names(colour_vector) <- unique(cur_sce$cell_type)
-colour_vector["Undifferentiated"] <- "white"
-colour_vector["Dividing"] <- colorRampPalette(c("white", "#00A087FF"))(10)[2]
-colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#00A087FF"))(10)[4]
-colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#00A087FF"))(10)[6]
-colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark green"))(10)[5]
-colour_vector["Goblet"] <- colorRampPalette(c("white", "dark green"))(10)[10]
-
-tsne.BE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  cell_type = cur_sce$cell_type)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
-  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
-  scale_color_manual(values = colour_vector) + theme_minimal()
-
-# Colour by entropy
-tsne.BE.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  entropy = entropy)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
-  geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
-  scale_color_gradientn(colours = magma(100)) + theme_minimal()
-
-# Visualize OLFM4
-tsne.BE.OLFM4 <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  OLFM4 = log2(normcounts(cur_sce)[rowData(cur_sce)$Symbol == "OLFM4",] + 1))) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
-  geom_point(aes(tSNE1, tSNE2, colour = OLFM4)) +
-  scale_color_viridis() + theme_minimal()
-
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/BE_tsne.pdf", tsne.BE, width = 6, height = 5)
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/BE_tsne_entropy.pdf", tsne.BE.entropy, width = 6, height = 5)
-```
-
-# Entropy in GC samples
-
-```{r}
-# Select D2 cells
-cur_sce <- sce[,sce$Tissue == "GC"]
-
-# Only genes that are expressed
-cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
-
-# Normalization across all cells
-cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
-cur_sce <- normalize(cur_sce, return_log = FALSE)
-
-cur_counts <- as.matrix(normcounts(cur_sce))
-
-# Calculate entropy
-probs   <- t(t(cur_counts)/colSums(cur_counts))
-logprobs <- log(probs)
-logprobs[logprobs == -Inf] <- 0
-logprobs.1 <- probs*logprobs
-entropy <- -colSums(probs*logprobs)
-
-# Entropy is normalized based on the number of genes
-entropy <- entropy/log(nrow(cur_counts))
-
-sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
-cur_sce <- do.call("cbind", sce.list)
-corrected <- batch.correction(sce.list)
-
-# Compute tSNE
-set.seed(12345)
-tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
-
-# Create colour vector
-colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
-names(colour_vector) <- unique(cur_sce$cell_type)
 colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[10]
 colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark blue"))(10)[10]
 colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[3]
 colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[6]
 colour_vector["Chief"] <- colorRampPalette(c("white", "dark blue"))(10)[6]
 colour_vector["Parietal"] <- colorRampPalette(c("white", "dark blue"))(10)[3]
+colour_vector["Foveolar_Intermediate.goblet"] <- "black"
+colour_vector["Endocrine.Undifferentiated"] <- "grey60"
+colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
 
-tsne.GC <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  cell_type = cur_sce$cell_type)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
-  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
-  scale_color_manual(values = colour_vector) + theme_minimal()
+p.all.cells.cell_type <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
+                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
+                  tissue = colData(cur_sce)$cell_type)) +
+  geom_point(aes(tsne1, tsne2), colour = "black", size = 1) + 
+  geom_point(aes(tsne1, tsne2, colour = tissue), size = 0.5) + 
+  scale_color_manual(values = colour_vector) + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "grey"))
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/Cell_type.pdf", p.all.cells.cell_type, width = 7, height = 5)
 
-# Colour by entropy
-tsne.GC.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  entropy = entropy)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
-  geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
-  scale_color_gradientn(colours = magma(100)) + theme_minimal()
+# Visualize patient
+# Colouring for patient
+colour_vector <- vector(length = length(unique(cur_sce$Patient)))
+names(colour_vector) <- unique(cur_sce$Patient)
+colour_vector <- brewer.pal(7, "Accent")
 
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/GC_tsne.pdf", tsne.GC, width = 6, height = 5)
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/GC_tsne_entropy.pdf", tsne.GC.entropy, width = 6, height = 5)
+p.all.cells.patient <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
+                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
+                  tissue = colData(cur_sce)$Patient)) +
+  geom_point(aes(tsne1, tsne2), colour = "black", size = 1) + 
+  geom_point(aes(tsne1, tsne2, colour = tissue), size = 0.5) + 
+  scale_color_manual(values = colour_vector) + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "grey"))
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/Patient.pdf", p.all.cells.patient, width = 7, height = 5)
 ```
 
-# Entropy in SMG samples
+# Differential expression analysis
+
+Here we berform differential expression analysis between NE and squamous cells of GOJ, GC and columnar cells of GC, NE and squamous cells of SCJ, BE and columnar cells of SCJ.
+For this, we will sum the raw counts for each gene across all cells per tissue and per patient. 
+We then use edgeR on these pseudo-bulk samples to test for changes in mean expression.
 
 ```{r}
-# Select D2 cells
-cur_sce <- sce[,sce$Tissue == "SMG"]
+# Define conditions to test
+# First two slots are tissues and last slot is cell-types to compare
+cond <- list(c("NE", "GOJ", "Basal-Intermediate-Superficial-Dividing"),
+             c("GC", "GOJ", "Foveolar_Intermediate-Foveolar_differentiated-Endocrine-Undifferentiated-Chief"),
+             c("BE", "SCJ", "Foveolar_differentiated-Foveolar_Intermediate-Undifferentiated-Dividing"),
+             c("NE", "SCJ", "Basal-Intermediate-Superficial-Dividing"))
 
-# Only genes that are expressed
-cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
+for(i in 1:length(cond)){
+  tissue1 <- cond[[i]][1]
+  tissue2 <- cond[[i]][2]
+  cell_types <- unlist(strsplit(cond[[i]][3], "-"))
+  
+  # Select cells
+  sce_to_test <- cur_sce[,(cur_sce$Tissue == tissue1 | 
+                             cur_sce$Tissue == tissue2) &
+                           cur_sce$cell_type %in% cell_types]
+  
+  # Remove non-expressed genes 
+  sce_to_test <- sce_to_test[Matrix::rowSums(counts(sce_to_test)) > 0,]
+  
+  # Peform DE
+  cur_out <- DE.edgeR(sce = sce_to_test,
+                      conditions = sce_to_test$Tissue,
+                      covariate = sce_to_test$Patient,
+                      lfc = 0.5,
+                      FDR = 0.1)
+  
+  # Calculate the percentage of DE genes
+  print(nrow(do.call("rbind", cur_out))/nrow(sce_to_test))
+}
 
-# Normalization across all cells
-cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
-cur_sce <- normalize(cur_sce, return_log = FALSE)
-
-cur_counts <- as.matrix(normcounts(cur_sce))
-
-# Calculate entropy
-probs   <- t(t(cur_counts)/colSums(cur_counts))
-logprobs <- log(probs)
-logprobs[logprobs == -Inf] <- 0
-logprobs.1 <- probs*logprobs
-entropy <- -colSums(probs*logprobs)
-
-# Entropy is normalized based on the number of genes
-entropy <- entropy/log(nrow(cur_counts))
-
-sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
-cur_sce <- do.call("cbind", sce.list)
-corrected <- batch.correction(sce.list)
-
-# Compute tSNE
-set.seed(12345)
-tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
-
-# Create colour vector
-colour_vector <-  vector(length = length(unique(cur_sce$cell_type)))
-names(colour_vector) <- unique(cur_sce$cell_type)
-colour_vector["Mucous"] <- "saddlebrown"
-colour_vector["Serous"] <- "burlywood3"
-colour_vector["Duct_intercalating"] <- "burlywood4"
-colour_vector["Myo-epithelial"] <- "brown"
-
-tsne.SMG <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  cell_type = cur_sce$cell_type)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
-  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
-  scale_color_manual(values = colour_vector) + theme_minimal()
-
-# Colour by entropy
-tsne.SMG.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
-                  tSNE2 = tsne$Y[,2],
-                  entropy = entropy)) + 
-  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
-  geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
-  scale_color_gradientn(colours = magma(100)) + theme_minimal()
-
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/SMG_tsne.pdf", tsne.SMG, width = 6, height = 5)
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S11/SMG_tsne_entropy.pdf", tsne.SMG.entropy, width = 6, height = 5)
+# NE vs GOJ: 0%
+# GC vs GOJ: 0.2%
+# BE vs SCJ: 1.5%
+# NE vs SCJ: 0.2%
 ```
 
+```{r}
+sessionInfo()
+```

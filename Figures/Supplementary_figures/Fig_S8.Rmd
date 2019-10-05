@@ -1,5 +1,5 @@
 ---
-title: "Figure S8: Similarity between BE and all other tissues"
+title: "Figure S8: Entropy measures in all tissues"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -12,318 +12,334 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Here, we perform additional analyses on the similarity between BE and all other tissues.
+Here, we compute the entropy per cell for duodenum and normal oesophagus cells as a control for this measure to detect stem-cell-like phenotypes.
 
 # Read in the data
 
 ```{r libraries, message=FALSE}
-library(scran)
-library(scater)
-library(DropletUtils)
-library(openxlsx)
 library(Rtsne)
-library(pheatmap)
 library(viridis)
-library(ape)
-library(batchelor)
 source("../../Analysis/Functions/auxiliary.R")
-
 sce <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
-
-# Exclude contaminating cells
 sce <- sce[,sce$include]
 ```
 
-# Plot circular dendrogram of all clusters
+# Entropy in D2 samples
 
-To estimate the similarity between all cell types, we compute an averaged expression profile for each cell-type and perform hierarchical cluster analysis.
-Here, we calculate this on the non-batch corrected counts and thereby incorporating the inter-patient variation.
-We will first plot the dendogram across all genes, removing lowly expressed genes
+Here, we compute the entropy in the duodenum samples.
 
 ```{r}
-# Remove non-expressed genes
-sce <- sce[Matrix::rowMeans(counts(sce)) > 0,]
+# Select D2 cells
+cur_sce <- sce[,sce$Tissue == "D2"]
 
-# Normalize across all cells
-# We provide the cell-types as clusters
-sce <- computeSumFactors(sce, clusters=paste(sce$Tissue, sce$cell_type, sep = "_"))
-sce <- normalize(sce, return_log = FALSE)
+# Only genes that are expressed
+cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
 
-clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
-mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(sce))
-colnames(mat) <- unique(clusters)
+# Normalization across all cells
+cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
+cur_sce <- normalize(cur_sce, return_log = FALSE)
 
-for(i in unique(clusters)){
-  mat[,i] <- Matrix::rowMeans(normcounts(sce)[,clusters == i])
-}
+cur_counts <- as.matrix(normcounts(cur_sce))
 
-# Rename the matrix to contain the actual cell-type labels
-for(i in 1:ncol(mat)){
-  colnames(mat)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
-                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
-}
+# Calculate entropy
+probs   <- t(t(cur_counts)/colSums(cur_counts))
+logprobs <- log(probs)
+logprobs[logprobs == -Inf] <- 0
+logprobs.1 <- probs*logprobs
+entropy <- -colSums(probs*logprobs)
 
-# Calculate spearman correlation between cell types
-dend <- hclust(as.dist(sqrt(1 - cor(log2(mat + 1), method = "spearman"))/2), method = "ward.D2")
+# Entropy is normalized based on the number of genes
+entropy <- entropy/log(nrow(cur_counts))
 
-dev.off()
-pdf("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/Tree_all_genes.pdf", width = 10, height = 10)
-plot(as.phylo(dend), type = "fan", 
-     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
-dev.off()
-```
-
-Next we will use the same genes as the ones for batch correction.
-
-```{r}
-clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
-
-# Find highly variable genes
-# Load sce again to keep internal normalization intact
-sce.new <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
-sce.new <- sce.new[,sce.new$include]
-sce.list <- split.sce(sce.new, unique(sce.new$Sample), colData.name = "Sample")
-
-HVG.genes <- lapply(sce.list, function(n){
-  HVG <- trendVar(n, use.spikes = FALSE)
-  decomposeVar(n, HVG)
-})
-  
-HVG.df <- do.call("combineVar", HVG.genes)
-HVG.df <- HVG.df[order(HVG.df$bio, decreasing = TRUE),]
-genes <- rownames(HVG.df)[1:1000]
-
-mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = 1000)
-colnames(mat) <- unique(clusters)
-
-for(i in unique(clusters)){
-  mat[,i] <- Matrix::rowMeans(normcounts(sce)[genes,clusters == i])
-}
-
-# Rename the matrix to contain the actual cell-type labels
-for(i in 1:ncol(mat)){
-  colnames(mat)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
-                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
-}
-
-# Calculate spearman correlation between cell types
-dend <- hclust(as.dist(sqrt(1 - cor(log2(mat + 1), method = "spearman"))/2), method = "ward.D2")
-
-dev.off()
-pdf("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/Tree_HVG.pdf", width = 10, height = 10)
-plot(as.phylo(dend), type = "fan", 
-     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
-dev.off()
-```
-
-# Multi-batch scaling
-
-We next scale the batches as a way to remove batch effects. 
-
-```{r}
-# Read in the data
-sce <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
-
-# Exclude contaminating cells
-sce <- sce[,sce$include]
-
-# Split the object into batches
-sce.list <- split.sce(sce, unique(sce$Sample), colData.name = "Sample")
-
-# Scale batches
-library(batchelor)
-func <- paste0("batchelor::multiBatchNorm(", 
-                     paste0("sce.list[[", 1:length(sce.list), "]]", collapse=", "), 
-                     ")")
-sce.scaled <- eval( parse(text=func) )
-
-# Merge these datasets
-sce <- do.call("cbind", sce.scaled)
-
-# Remove non-expressed genes
-sce <- sce[Matrix::rowMeans(counts(sce)) > 0,]
-
-# Normalize across all cells
-# We provide the cell-types as clusters
-sce <- computeSumFactors(sce, clusters=paste(sce$Tissue, sce$cell_type, sep = "_"))
-sce <- normalize(sce, return_log = FALSE)
-```
-
-We next repeat the analysis as above.
-First, we calculate a consensus transcriptome for each cell-type based on all genes.
-
-```{r}
-clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
-mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(sce))
-colnames(mat) <- unique(clusters)
-
-for(i in unique(clusters)){
-  mat[,i] <- Matrix::rowMeans(normcounts(sce)[,clusters == i])
-}
-
-# Rename the matrix to contain the actual cell-type labels
-for(i in 1:ncol(mat)){
-  colnames(mat)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
-                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
-}
-
-# Calculate spearman correlation between cell types
-dend <- hclust(as.dist(sqrt(1 - cor(log2(mat + 1), method = "spearman"))/2), method = "ward.D2")
-
-dev.off()
-pdf("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/Tree_all_genes.batch_scaled.pdf", width = 10, height = 10)
-plot(as.phylo(dend), type = "fan", 
-     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
-dev.off()
-```
-
-Now with the HVGs.
-
-```{r}
-clusters <- paste(colData(sce)$Tissue, colData(sce)$Tissue_cluster, sep = "_")
-
-# Find highly variable genes
-# Load sce again to keep internal normalization intact
-sce.new <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
-sce.new <- sce.new[,sce.new$include]
-sce.list <- split.sce(sce.new, unique(sce.new$Sample), colData.name = "Sample")
-
-HVG.genes <- lapply(sce.list, function(n){
-  HVG <- trendVar(n, use.spikes = FALSE)
-  decomposeVar(n, HVG)
-})
-  
-HVG.df <- do.call("combineVar", HVG.genes)
-HVG.df <- HVG.df[order(HVG.df$bio, decreasing = TRUE),]
-genes <- rownames(HVG.df)[1:1000]
-
-mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = 1000)
-colnames(mat) <- unique(clusters)
-
-for(i in unique(clusters)){
-  mat[,i] <- Matrix::rowMeans(normcounts(sce)[genes,clusters == i])
-}
-
-# Rename the matrix to contain the actual cell-type labels
-for(i in 1:ncol(mat)){
-  colnames(mat)[i] <- unique(sce$cell_type[sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
-                                 sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
-}
-
-# Calculate spearman correlation between cell types
-dend <- hclust(as.dist(sqrt(1 - cor(log2(mat + 1), method = "spearman"))/2), method = "ward.D2")
-
-dev.off()
-pdf("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/Tree_HVG.batch_scaled.pdf", width = 10, height = 10)
-plot(as.phylo(dend), type = "fan", 
-     tip.color = metadata(sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
-dev.off()
-```
-
-# Different number of HVG
-
-Here, I will use different sets of genes to show that the batch correction is independent from the chosen gene set.
-
-```{r batch-correction}
-detach("package:batchelor", unload=TRUE)
-all_sce <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
-all_sce <- all_sce[,all_sce$include]
-sce.list <- split.sce(sce = all_sce, groups = unique(all_sce$Sample), colData.name = "Sample")
-
-# Combine sce objects
-all_sce <- do.call("cbind", sce.list)
-  
-# Batch correction
-corrected_1 <- batch.correction(sce.list, number.HVG = 500)
-corrected_2 <- batch.correction(sce.list, number.HVG = 2000)
-
-# Compute tsne on corrected counts
-set.seed(1234)
-tsne_1 <- Rtsne(t(corrected_1), pca = FALSE)
-tsne_2 <- Rtsne(t(corrected_2), pca = FALSE)
-
-# dendogram analysis
-clusters <- paste(colData(all_sce)$Tissue, colData(all_sce)$Tissue_cluster, sep = "_")
-mat_1 <- mat_2 <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(corrected_1))
-colnames(mat_1) <- colnames(mat_2) <- unique(clusters)
-
-for(i in unique(clusters)){
-  mat_1[,i] <- rowMeans(corrected_1[,clusters == i])
-  mat_2[,i] <- rowMeans(corrected_2[,clusters == i])
-}
-
-# Rename the matrix to contain the actual cell-type labels
-for(i in 1:ncol(mat_1)){
-  colnames(mat_1)[i] <- unique(all_sce$cell_type[all_sce$Tissue == sub("_[0-9]*$", "", colnames(mat_1)[i]) &
-                                 all_sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat_1)[i])])
-  colnames(mat_2)[i] <- unique(all_sce$cell_type[all_sce$Tissue == sub("_[0-9]*$", "", colnames(mat_2)[i]) &
-                                 all_sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat_2)[i])])
-}
-
-# Calculate euclidean distance on corrected counts
-dend_1 <- hclust(dist(t(mat_1), method = "euclidean"), method = "ward.D2")
-dend_2 <- hclust(dist(t(mat_2), method = "euclidean"), method = "ward.D2")
-dev.off()
-pdf("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/Tree_500HVG.pdf", width = 10, height = 10)
-plot(as.phylo(dend_1), type = "fan", 
-     tip.color = metadata(all_sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
-dev.off()
-
-pdf("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/Tree_2000HVG.pdf", width = 10, height = 10)
-plot(as.phylo(dend_2), type = "fan", 
-     tip.color = metadata(all_sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
-dev.off()
-```
-
-# Patient correction
-
-Next, I will only correct across the different patients.
-
-```{r}
-all_sce <- readRDS("../../../../Dropbox (Personal)//Oesophagus_single_cell/All_corrected_sce.rds")
-all_sce <- all_sce[,all_sce$include]
-sce.list <- split.sce(sce = all_sce, groups = unique(all_sce$Patient), colData.name = "Patient")
-
-# Correctly normalize for each patient
-sce.list <- lapply(sce.list, function(n){
-  cur_cluster <- quickCluster(n, method = "igraph", irlba.args = c("work" = 100))
-  n <- computeSumFactors(n, clusters=cur_cluster)
-  n <- normalize(n, return_log = TRUE)
-  n
-})
-
-# Order list
-sce.list <- sce.list[c("Patient2", "Patient3", "Patient7", "Patient9", "Patient8", "Patient10", "Patient12", "Patient11", "Patient13")]
-
-# Combine sce objects
-all_sce <- do.call("cbind", sce.list)
-
-# Perform batch correction
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+cur_sce <- do.call("cbind", sce.list)
 corrected <- batch.correction(sce.list)
 
-set.seed(1234)
-tsne <- Rtsne(t(corrected), pca = FALSE, perxplexity = 100)
+# Compute tSNE
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
 
-# dendogram analysis
-clusters <- paste(colData(all_sce)$Tissue, colData(all_sce)$Tissue_cluster, sep = "_")
-mat <- matrix(data = NA, ncol = length(unique(clusters)), nrow = nrow(corrected))
-colnames(mat) <- unique(clusters)
+# Create colour vector
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Enterocytes_Intermediate"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[6]
+colour_vector["Enterocytes_differentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[10]
+colour_vector["Dividing"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[3]
+colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#3C5488FF"))(10)[1]
+colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
+colour_vector["Paneth"] <- colorRampPalette(c("white", "seagreen4"))(10)[6]
 
-for(i in unique(clusters)){
-  mat[,i] <- rowMeans(corrected[,clusters == i])
-}
+tsne.D2 <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  cell_type = cur_sce$cell_type)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
+  scale_color_manual(values = colour_vector) + theme_minimal()
 
-# Rename the matrix to contain the actual cell-type labels
-for(i in 1:ncol(mat)){
-  colnames(mat)[i] <- unique(all_sce$cell_type[all_sce$Tissue == sub("_[0-9]*$", "", colnames(mat)[i]) &
-                                 all_sce$Tissue_cluster == sub("^[A-Z2]*_", "", colnames(mat)[i])])
-}
+# Colour by entropy
+tsne.D2.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100)) + theme_minimal()
 
-# Calculate euclidean distance on corrected counts
-dend <- hclust(dist(t(mat), method = "euclidean"), method = "ward.D2")
-dev.off()
-pdf("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/Tree_patient_correction.pdf", width = 10, height = 10)
-plot(as.phylo(dend), type = "fan", 
-     tip.color = metadata(all_sce)$colour_vector[sub("_[0-9]*$", "", unique(clusters))])
-dev.off()
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/D2_tsne.pdf", tsne.D2, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/D2_tsne_entropy.pdf", tsne.D2.entropy, width = 6, height = 5)
 ```
+
+# Entropy in NE samples
+
+Here, we compute the entropy in the normal oesophagus samples.
+
+```{r}
+# Select D2 cells
+cur_sce <- sce[,sce$Tissue == "NE"]
+
+# Only genes that are expressed
+cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
+
+# Normalization across all cells
+cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
+cur_sce <- normalize(cur_sce, return_log = FALSE)
+
+cur_counts <- as.matrix(normcounts(cur_sce))
+
+# Calculate entropy
+probs   <- t(t(cur_counts)/colSums(cur_counts))
+logprobs <- log(probs)
+logprobs[logprobs == -Inf] <- 0
+logprobs.1 <- probs*logprobs
+entropy <- -colSums(probs*logprobs)
+
+# Entropy is normalized based on the number of genes
+entropy <- entropy/log(nrow(cur_counts))
+
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+cur_sce <- do.call("cbind", sce.list)
+corrected <- batch.correction(sce.list)
+
+# Compute tSNE
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+
+# Create colour vector
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Unknown"] <- "grey"
+colour_vector["Superficial"] <- colorRampPalette(c("white", "dark red"))(10)[10]
+colour_vector["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
+colour_vector["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
+colour_vector["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[1]
+
+tsne.NE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  cell_type = cur_sce$cell_type)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
+  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
+  scale_color_manual(values = colour_vector) + theme_minimal()
+
+# Colour by entropy
+tsne.NE.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100)) + theme_minimal()
+
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/NE_tsne.pdf", tsne.NE, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/NE_tsne_entropy.pdf", tsne.NE.entropy, width = 6, height = 5)
+```
+
+# Entropy in BE samples
+
+```{r}
+# Select D2 cells
+cur_sce <- sce[,sce$Tissue == "BE"]
+
+# Only genes that are expressed
+cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
+
+# Normalization across all cells
+cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
+cur_sce <- normalize(cur_sce, return_log = FALSE)
+
+cur_counts <- as.matrix(normcounts(cur_sce))
+
+# Calculate entropy
+probs   <- t(t(cur_counts)/colSums(cur_counts))
+logprobs <- log(probs)
+logprobs[logprobs == -Inf] <- 0
+logprobs.1 <- probs*logprobs
+entropy <- -colSums(probs*logprobs)
+
+# Entropy is normalized based on the number of genes
+entropy <- entropy/log(nrow(cur_counts))
+
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+cur_sce <- do.call("cbind", sce.list)
+corrected <- batch.correction(sce.list)
+
+# Compute tSNE
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+
+# Create colour vector
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Undifferentiated"] <- "white"
+colour_vector["Dividing"] <- colorRampPalette(c("white", "#00A087FF"))(10)[2]
+colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#00A087FF"))(10)[4]
+colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#00A087FF"))(10)[6]
+colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark green"))(10)[5]
+colour_vector["Goblet"] <- colorRampPalette(c("white", "dark green"))(10)[10]
+
+tsne.BE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  cell_type = cur_sce$cell_type)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
+  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
+  scale_color_manual(values = colour_vector) + theme_minimal()
+
+# Colour by entropy
+tsne.BE.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100)) + theme_minimal()
+
+# Visualize OLFM4
+tsne.BE.OLFM4 <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  OLFM4 = log2(normcounts(cur_sce)[rowData(cur_sce)$Symbol == "OLFM4",] + 1))) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = OLFM4)) +
+  scale_color_viridis() + theme_minimal()
+
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/BE_tsne.pdf", tsne.BE, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/BE_tsne_entropy.pdf", tsne.BE.entropy, width = 6, height = 5)
+```
+
+# Entropy in GC samples
+
+```{r}
+# Select D2 cells
+cur_sce <- sce[,sce$Tissue == "GC"]
+
+# Only genes that are expressed
+cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
+
+# Normalization across all cells
+cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
+cur_sce <- normalize(cur_sce, return_log = FALSE)
+
+cur_counts <- as.matrix(normcounts(cur_sce))
+
+# Calculate entropy
+probs   <- t(t(cur_counts)/colSums(cur_counts))
+logprobs <- log(probs)
+logprobs[logprobs == -Inf] <- 0
+logprobs.1 <- probs*logprobs
+entropy <- -colSums(probs*logprobs)
+
+# Entropy is normalized based on the number of genes
+entropy <- entropy/log(nrow(cur_counts))
+
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+cur_sce <- do.call("cbind", sce.list)
+corrected <- batch.correction(sce.list)
+
+# Compute tSNE
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+
+# Create colour vector
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[10]
+colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark blue"))(10)[10]
+colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[3]
+colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[6]
+colour_vector["Chief"] <- colorRampPalette(c("white", "dark blue"))(10)[6]
+colour_vector["Parietal"] <- colorRampPalette(c("white", "dark blue"))(10)[3]
+
+tsne.GC <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  cell_type = cur_sce$cell_type)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
+  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
+  scale_color_manual(values = colour_vector) + theme_minimal()
+
+# Colour by entropy
+tsne.GC.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100)) + theme_minimal()
+
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/GC_tsne.pdf", tsne.GC, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/GC_tsne_entropy.pdf", tsne.GC.entropy, width = 6, height = 5)
+```
+
+# Entropy in SMG samples
+
+```{r}
+# Select D2 cells
+cur_sce <- sce[,sce$Tissue == "SMG"]
+
+# Only genes that are expressed
+cur_sce <- cur_sce[Matrix::rowSums(logcounts(cur_sce)) > 0,]
+
+# Normalization across all cells
+cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
+cur_sce <- normalize(cur_sce, return_log = FALSE)
+
+cur_counts <- as.matrix(normcounts(cur_sce))
+
+# Calculate entropy
+probs   <- t(t(cur_counts)/colSums(cur_counts))
+logprobs <- log(probs)
+logprobs[logprobs == -Inf] <- 0
+logprobs.1 <- probs*logprobs
+entropy <- -colSums(probs*logprobs)
+
+# Entropy is normalized based on the number of genes
+entropy <- entropy/log(nrow(cur_counts))
+
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+cur_sce <- do.call("cbind", sce.list)
+corrected <- batch.correction(sce.list)
+
+# Compute tSNE
+set.seed(12345)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+
+# Create colour vector
+colour_vector <-  vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Mucous"] <- "saddlebrown"
+colour_vector["Serous"] <- "burlywood3"
+colour_vector["Duct_intercalating"] <- "burlywood4"
+colour_vector["Myo-epithelial"] <- "brown"
+
+tsne.SMG <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  cell_type = cur_sce$cell_type)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
+  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
+  scale_color_manual(values = colour_vector) + theme_minimal()
+
+# Colour by entropy
+tsne.SMG.entropy <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  entropy = entropy)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) + 
+  geom_point(aes(tSNE1, tSNE2, colour = entropy)) +
+  scale_color_gradientn(colours = magma(100)) + theme_minimal()
+
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/SMG_tsne.pdf", tsne.SMG, width = 6, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S8/SMG_tsne_entropy.pdf", tsne.SMG.entropy, width = 6, height = 5)
+```
+

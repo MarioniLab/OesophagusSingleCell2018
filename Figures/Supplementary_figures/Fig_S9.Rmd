@@ -1,0 +1,123 @@
+---
+title: "Figure S9: Characterization of BE cells"
+author: "Nils Eling"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script plots cell-types of BE and highlights marker genes.
+
+# Read in the data
+
+```{r libraries, message=FALSE}
+library(scran)
+library(scater)
+library(DropletUtils)
+library(openxlsx)
+library(Rtsne)
+library(pheatmap)
+library(viridis)
+source("../../Analysis/Functions/auxiliary.R")
+
+sce <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
+
+# Remove contaminating cell-types
+sce <- sce[,sce$include]
+```
+
+# Barret's oesophagus
+
+We will visualize marker genes of Barret's oesophagus.
+
+## Dimensionality reduction
+
+```{r}
+cur_sce <- sce[,sce$Tissue == "BE"]
+
+# Split the samples to perform batch correction
+sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+cur_sce <- do.call("cbind", sce.list)
+corrected <- batch.correction(sce.list)
+
+# Compute tSNE
+set.seed(123)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
+
+# Create colour vector
+colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
+names(colour_vector) <- unique(cur_sce$cell_type)
+colour_vector["Undifferentiated"] <- "white"
+colour_vector["Dividing"] <- colorRampPalette(c("white", "#00A087FF"))(10)[2]
+colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#00A087FF"))(10)[4]
+colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#00A087FF"))(10)[6]
+colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark green"))(10)[5]
+colour_vector["Goblet"] <- colorRampPalette(c("white", "dark green"))(10)[10]
+
+tsne.BE <- ggplot(data.frame(tSNE1 = tsne$Y[,1],
+                  tSNE2 = tsne$Y[,2],
+                  cell_type = cur_sce$cell_type)) + 
+  geom_point(aes(tSNE1, tSNE2), colour = "black", size = 2) +
+  geom_point(aes(tSNE1, tSNE2, colour = cell_type)) +
+  scale_color_manual(values = colour_vector) + theme_minimal()
+
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S9/BE_tsne.pdf", tsne.BE, width = 6, height = 5)
+```
+
+```{r}
+# Remove non-expressed genes
+cur_sce <- cur_sce[Matrix::rowSums(counts(cur_sce)) > 0,]
+
+# Perform DE to find marker genes
+DE.genes <- multi.DE(sce = cur_sce, 
+                     conditions = cur_sce$cell_type,
+                     covariate = cur_sce$Patient,
+                     lfc = 0.5,
+                     FDR = 0.1)
+
+# Save as table
+write.xlsx(DE.genes, file = "../../../../Dropbox (Personal)/Origin_of_BE_draft/Figures/Supplemental_tables/Table_S6.xlsx")
+```
+
+## Marker gene expression
+
+Here, we visualize marker gene expression in form of a heatmap
+
+```{r}
+genes <- c("MUC5AC", "KRT20", 
+           "MUC6", 
+           "MUC2", "TFF3", "KRT7",
+           "CHGA", 
+           "OLFM4")
+
+# Normalization across all cells
+cur_sce <- computeSumFactors(cur_sce, clusters=paste(cur_sce$cell_type))
+cur_sce <- normalize(cur_sce, return_log = TRUE)
+
+for.heatmap <- logcounts(cur_sce)[match(genes, rowData(cur_sce)$Symbol),]
+colnames(for.heatmap) <- paste(cur_sce$Barcode, cur_sce$Patient, sep = "_")
+
+# Order cells by cell-type
+ordering <- c(which(cur_sce$cell_type == "Undifferentiated"),
+              which(cur_sce$cell_type == "Dividing"),
+               which(cur_sce$cell_type == "Foveolar_Intermediate"),
+               which(cur_sce$cell_type == "Foveolar_differentiated"),
+               which(cur_sce$cell_type == "Endocrine"),
+               which(cur_sce$cell_type == "Goblet"))
+
+dev.off()
+pdf(file = "../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S9/BE_heatmap.pdf", height = 7, width = 7)
+pheatmap(for.heatmap[,ordering], cluster_rows = FALSE, color = viridis(100), 
+         labels_row = genes, show_colnames = FALSE,
+         annotation_col = data.frame(row.names = colnames(for.heatmap)[ordering],
+                                     cell_type = cur_sce$cell_type[ordering]), 
+         annotation_colors = list(cell_type = colour_vector),
+         cluster_cols = FALSE)
+dev.off()
+```

@@ -1,5 +1,5 @@
 ---
-title: "Figure S6: Differential expression analysis between tissues"
+title: "Figure S6: Computational processing of all data"
 author: "Nils Eling"
 date: "`r Sys.Date()`"
 output: 
@@ -12,7 +12,9 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-This script focuses on detecting the genes that are differentially expressed between BE and SCJ, GC and GOJ, NE and SCJ and NE and GOJ
+This script visualizes the filtered data obtained after running the Quality_control, Normalization and Further_processing scripts. 
+We will first plot these cells to highlight the patient effect and afterwards perform batch-correction.
+Finally, we will mark the high-quality batches and cells.
 
 # Read in the data
 
@@ -22,152 +24,163 @@ library(scater)
 library(DropletUtils)
 library(openxlsx)
 library(Rtsne)
-library(pheatmap)
-library(RColorBrewer)
-library(edgeR)
-library(viridis)
 source("../../Analysis/Functions/auxiliary.R")
-sce <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
 ```
 
-# Visualize GC, GOJ, BE and SCJ samples
+# Dimensionality reduction
 
-Here we perform differential expression (DE) analysis between the epithelial tissues of the GC, GOJ, SCJ, BE and NE samples.
+We will first visualize the uncorrected data.
 
 ```{r}
-# Select tissues to test
-cur_sce <- sce[,sce$include & sce$Tissue %in% c("NE", "GC", "BE", "GOJ", "SCJ")]
+# Read in all datafiles
+sce.list <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_sce.rds")
 
-# Perform batch correction
-sce.list <- split.sce(cur_sce, unique(cur_sce$Sample), colData.name = "Sample")
+# Here we exclude the samples that were just used as test runs
+sce.list <- sce.list[!(names(sce.list) %in% c("Patient6_SIGAH9_DT1", "Patient6_SIGAG9_GD3",
+                                              "Patient4_SIGAG4_SMG"))]
+
+# Remove all unecessary rowData prior to merging
+sce.list <- lapply(sce.list, function(n){
+    rowData(n) <- rowData(n)[,1:3]
+    n
+  })
+
+# Merge datasets
+sce.all <- do.call("cbind", sce.list)
+
+# Normalize across all cells
+clusters <- quickCluster(sce.all, method = "igraph", irlba.args = c("work" = 100))
+sce.all <- computeSumFactors(sce.all, clusters=clusters)
+sce.all <- normalize(sce.all, return_log = TRUE)
+
+# Compute the top 1000 shared highly variable genes
+HVG.genes <- lapply(sce.list, function(n){
+    HVG <- trendVar(n, use.spikes = FALSE)
+    decomposeVar(n, HVG)
+  })
+HVG.df <- do.call("combineVar", HVG.genes)
+HVG.df <- HVG.df[order(HVG.df$bio, decreasing = TRUE),]
+HVgenes <- rownames(HVG.df)[1:1000]
+
+# Compute tsne
+set.seed(123456)
+tsne <- Rtsne(t(as.matrix(logcounts(sce.all)[HVgenes,])), perplexity = 100)
+
+# Create annotation and colour vector
+annot <- paste(colData(sce.all)$Tissue, colData(sce.all)$Patient, sep = "_")
+annot.col <- vector(length = length(unique(annot)))
+names(annot.col) <- unique(annot)
+annot.col[grepl("NE", names(annot.col))] <- colorRampPalette(c("white", "dark red"))(21)[c(5,7,9,11,13,15,17,19,21)]
+annot.col[grepl("GOJ", names(annot.col))] <- colorRampPalette(c("white", "#F39B7FFF"))(21)[c(9,11,13,15,17,19,21)]
+annot.col[grepl("SCJ", names(annot.col))] <- colorRampPalette(c("white", "#DC0000FF"))(17)[c(13,15,17)]
+annot.col[grepl("BE", names(annot.col))] <- colorRampPalette(c("white", "#00A087FF"))(17)[c(5,9,13,17)]
+annot.col[grepl("D2", names(annot.col))] <- colorRampPalette(c("white", "#3C5488FF"))(17)[c(5,9,13,17)]
+annot.col[grepl("GC", names(annot.col))] <- colorRampPalette(c("white", "#4DBBD5FF"))(25)[c(5,7,9,11,13,15,17,19,21,23,25)]
+annot.col[grepl("SMG", names(annot.col))] <- colorRampPalette(c("white", "#B09C85FF"))(17)[c(5,9,13)]
+
+# Plot tsne
+tsne.uncorrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], 
+                                      tsne2 = tsne$Y[,2], 
+                                      Sample = annot)) + 
+  geom_point(aes(tsne1, tsne2, colour = Sample)) + 
+  scale_colour_manual(values = annot.col) + 
+  theme_minimal()
+
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/All_data_uncorrected.pdf", tsne.uncorrected, width = 12, height = 7)
+```
+
+# Batch correction across tissues
+
+We will now perform batch correction across all samples. 
+For this, we will use the samples that contain a mix of different tissues first.
+
+```{r}
+# Order sce objects for batch correction
+n <- names(sce.list)
+sce.list <- sce.list[c(which(grepl("GOJ", n)), which(grepl("SCJ", n)),
+                       which(grepl("NE", n)), which(grepl("GC", n)),
+                       which(grepl("BE", n)), which(grepl("D2", n)),
+                       which(grepl("SMG", n)))]
+
+# Combine sce objects
+sce.all <- do.call("cbind", sce.list)
+  
+# Batch correction
 corrected <- batch.correction(sce.list)
-cur_sce <- do.call("cbind", sce.list)
+  
+# Compute tsne on corrected counts
+set.seed(123)
+tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 150)
 
-# Compute new tSNE
-set.seed(11111)
-tsne <- Rtsne(t(corrected), pca = FALSE, perplexity = 100)
-reducedDims(cur_sce)$TSNE <- tsne$Y
+# Visualize batches
+annot <- paste(colData(sce.all)$Tissue, colData(sce.all)$Patient, sep = "_")
 
-# Visualize tSNEs
-# Tissue
-p.all.cells <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
-                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
-                  tissue = colData(cur_sce)$Tissue)) + 
-  geom_point(aes(tsne1, tsne2), colour = "black", size = 1) + 
-  geom_point(aes(tsne1, tsne2, colour = tissue), size = 0.5) + 
-  scale_color_manual(values = metadata(cur_sce)$colour_vector) + 
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        panel.background = element_blank(), 
-        axis.line = element_line(colour = "grey"))
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/All_cells.pdf", p.all.cells, width = 7, height = 5)
+tsne.corrected <- ggplot(data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], 
+                        Sample = annot)) + 
+  geom_point(aes(tsne1, tsne2, colour = Sample)) + scale_colour_manual(values = annot.col) + theme_minimal()
 
-# Tissue typse
-p.all.cells.tissue_type <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
-                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
-                  tissue = colData(cur_sce)$tissue_type)) +
-  geom_point(aes(tsne1, tsne2), colour = "black", size = 1) + 
-  geom_point(aes(tsne1, tsne2, colour = tissue), size = 0.5) + 
-  scale_color_manual(values = c("dark blue", "dark red")) + 
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        panel.background = element_blank(), 
-        axis.line = element_line(colour = "grey"))
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/Tissue_type.pdf", p.all.cells.tissue_type, width = 7, height = 5)
-
-# Cell type
-colour_vector <- vector(length = length(unique(cur_sce$cell_type)))
-names(colour_vector) <- unique(cur_sce$cell_type)
-colour_vector["Unknown"] <- "grey20"
-colour_vector["Superficial"] <- colorRampPalette(c("white", "dark red"))(10)[10]
-colour_vector["Basal"] <- colorRampPalette(c("white", "dark red"))(10)[4]
-colour_vector["Intermediate"] <- colorRampPalette(c("white", "dark red"))(10)[7]
-colour_vector["Dividing"] <- colorRampPalette(c("white", "dark red"))(10)[1]
-colour_vector["Foveolar_differentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[10]
-colour_vector["Endocrine"] <- colorRampPalette(c("white", "dark blue"))(10)[10]
-colour_vector["Undifferentiated"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[3]
-colour_vector["Foveolar_Intermediate"] <- colorRampPalette(c("white", "#4DBBD5FF"))(10)[6]
-colour_vector["Chief"] <- colorRampPalette(c("white", "dark blue"))(10)[6]
-colour_vector["Parietal"] <- colorRampPalette(c("white", "dark blue"))(10)[3]
-colour_vector["Foveolar_Intermediate.goblet"] <- "black"
-colour_vector["Endocrine.Undifferentiated"] <- "grey60"
-colour_vector["Goblet"] <- colorRampPalette(c("white", "seagreen4"))(10)[10]
-
-p.all.cells.cell_type <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
-                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
-                  tissue = colData(cur_sce)$cell_type)) +
-  geom_point(aes(tsne1, tsne2), colour = "black", size = 1) + 
-  geom_point(aes(tsne1, tsne2, colour = tissue), size = 0.5) + 
-  scale_color_manual(values = colour_vector) + 
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        panel.background = element_blank(), 
-        axis.line = element_line(colour = "grey"))
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/Cell_type.pdf", p.all.cells.cell_type, width = 7, height = 5)
-
-# Visualize patient
-# Colouring for patient
-colour_vector <- vector(length = length(unique(cur_sce$Patient)))
-names(colour_vector) <- unique(cur_sce$Patient)
-colour_vector <- brewer.pal(7, "Accent")
-
-p.all.cells.patient <- ggplot(data.frame(tsne1 = reducedDims(cur_sce)$TSNE[,1],
-                  tsne2 = reducedDims(cur_sce)$TSNE[,2],
-                  tissue = colData(cur_sce)$Patient)) +
-  geom_point(aes(tsne1, tsne2), colour = "black", size = 1) + 
-  geom_point(aes(tsne1, tsne2, colour = tissue), size = 0.5) + 
-  scale_color_manual(values = colour_vector) + 
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        panel.background = element_blank(), 
-        axis.line = element_line(colour = "grey"))
-ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/Patient.pdf", p.all.cells.patient, width = 7, height = 5)
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/All_data_corrected.pdf", tsne.corrected, width = 12, height = 7)
 ```
 
-# Differential expression analysis
+# High quality samples
 
-Here we berform differential expression analysis between NE and squamous cells of GOJ, GC and columnar cells of GC, NE and squamous cells of SCJ, BE and columnar cells of SCJ.
-For this, we will sum the raw counts for each gene across all cells per tissue and per patient. 
-We then use edgeR on these pseudo-bulk samples to test for changes in mean expression.
+In the next step, we will highlight the high quality samples. 
+The exclusion criteria is explained in Suppementary Note 1.
 
 ```{r}
-# Define conditions to test
-# First two slots are tissues and last slot is cell-types to compare
-cond <- list(c("NE", "GOJ", "Basal-Intermediate-Superficial-Dividing"),
-             c("GC", "GOJ", "Foveolar_Intermediate-Foveolar_differentiated-Endocrine-Undifferentiated-Chief"),
-             c("BE", "SCJ", "Foveolar_differentiated-Foveolar_Intermediate-Undifferentiated-Dividing"),
-             c("NE", "SCJ", "Basal-Intermediate-Superficial-Dividing"))
+# Read in the data of high quality samples
+sce.high.quality <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/High_quality_sce.rds")
+annot.high.quality <- sapply(names(sce.high.quality), function(n){paste(unlist(strsplit(n, "_"))[c(3,1)], collapse = "_")})
 
-for(i in 1:length(cond)){
-  tissue1 <- cond[[i]][1]
-  tissue2 <- cond[[i]][2]
-  cell_types <- unlist(strsplit(cond[[i]][3], "-"))
-  
-  # Select cells
-  sce_to_test <- cur_sce[,(cur_sce$Tissue == tissue1 | 
-                             cur_sce$Tissue == tissue2) &
-                           cur_sce$cell_type %in% cell_types]
-  
-  # Remove non-expressed genes 
-  sce_to_test <- sce_to_test[Matrix::rowSums(counts(sce_to_test)) > 0,]
-  
-  # Peform DE
-  cur_out <- DE.edgeR(sce = sce_to_test,
-                      conditions = sce_to_test$Tissue,
-                      covariate = sce_to_test$Patient,
-                      lfc = 0.5,
-                      FDR = 0.1)
-  
-  # Calculate the percentage of DE genes
-  print(nrow(do.call("rbind", cur_out))/nrow(sce_to_test))
-}
+# Grey out the cells that we are not using
+annot.col.high.quality <- annot.col
+annot.col.high.quality[!(names(annot.col.high.quality) %in% annot.high.quality)] <- "black"
 
-# NE vs GOJ: 0%
-# GC vs GOJ: 0.2%
-# BE vs SCJ: 1.5%
-# NE vs SCJ: 0.2%
+# Dataframe for visualization
+df <- data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], 
+                 Sample = annot,
+                 include = paste(sce.all$Tissue, sce.all$Patient, sep = "_") %in%
+                   annot.high.quality)
+
+tsne.corrected.high.quality <- ggplot() + 
+  geom_point(data = df[df$include,],
+             aes(tsne1, tsne2, colour = Sample)) +
+  geom_point(data = df[!df$include,],
+             aes(tsne1, tsne2, colour = Sample), shape = 1, alpha = 0.5) +
+  scale_colour_manual(values = annot.col.high.quality) + 
+  theme_minimal()
+
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/All_data_corrected_highQuality.pdf", tsne.corrected.high.quality, width = 12, height = 7)
 ```
 
+# View clusters that were removed due to possible contaminations
+
+In the final step, we remove groups of cells that present contaminations when sampling the tissues.
+For example these are squamous oesophagus cells found in the gastric sample.
+
 ```{r}
-sessionInfo()
+sce.final <- readRDS("../../../../Dropbox (Personal)/Oesophagus_single_cell/All_corrected_sce.rds")
+
+# Create new colour vector
+annot <- paste(sce.all$Tissue, sce.all$Patient, sep = "_")
+annot[!(annot %in% annot.high.quality)] <- "exclude"
+annot[match(paste(sce.final$Sample[!sce.final$include], sce.final$Barcode[!sce.final$include], sep = "_"), paste(sce.all$Sample, sce.all$Barcode, sep = "_"))] <- "exclude"
+
+# Grey out the cells that we are not using
+annot.col.high.quality <- c(annot.col, "black")
+names(annot.col.high.quality)[length(annot.col.high.quality)] <- "exclude"
+
+# Dataframe for visualization
+df <- data.frame(tsne1 = tsne$Y[,1], tsne2 = tsne$Y[,2], 
+                 Sample = annot)
+
+tsne.corrected.final <- ggplot() + 
+  geom_point(data = df[df$Sample == "exclude",],
+             aes(tsne1, tsne2, colour = Sample)) +
+  geom_point(data = df[df$Sample != "exclude",],
+             aes(tsne1, tsne2, colour = Sample)) +
+  scale_colour_manual(values = annot.col.high.quality) + 
+  theme_minimal()
+
+ggsave("../../../../Dropbox (Personal)/Oesophagus_single_cell/Results/Figures/Supplementary_figures/S6/All_data_corrected_final.pdf", tsne.corrected.final, width = 12, height = 7)
 ```
